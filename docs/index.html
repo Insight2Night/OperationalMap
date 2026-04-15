@@ -68,6 +68,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 /* MAIN AREA */
 .main{flex:1;overflow:hidden;position:relative}
 
+/* STATUS BAR */
+.status-bar{padding:6px 24px;font-size:11px;color:var(--text-dim);border-top:1px solid rgba(45,53,72,0.3);flex-shrink:0}
+
 /* GRAPH CANVAS */
 #graph-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:grab}
 #graph-canvas:active{cursor:grabbing}
@@ -78,6 +81,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .graph-ctrl-btn:hover{border-color:var(--purple);color:var(--purple-light);background:rgba(28,35,51,0.95)}
 .graph-ctrl-btn.active{border-color:var(--purple);color:var(--purple-light);background:rgba(109,32,119,0.15)}
 .graph-ctrl-btn .btn-label{font-size:10px;font-weight:600;letter-spacing:0.3px}
+
+/* GRAPH LEGEND */
+.graph-legend{position:absolute;bottom:16px;left:16px;display:flex;gap:10px;z-index:10;background:rgba(28,35,51,0.85);backdrop-filter:blur(8px);border:1px solid var(--card-border);border-radius:8px;padding:6px 12px;align-items:center}
+.graph-legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);cursor:pointer;transition:var(--transition);white-space:nowrap}
+.graph-legend-item:hover{color:var(--text)}
+.graph-legend-item.dimmed{opacity:0.3}
+.graph-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
 /* LIST VIEWS (Table, Cards, Tree) */
 .list-view{position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;padding:20px 24px;display:none}
@@ -223,11 +233,20 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝 Text</button>
     </div>
   </div>
+  <div class="status-bar" id="status-bar"></div>
 </div>
 
 <!-- MAIN -->
 <div class="main" id="main-area">
   <canvas id="graph-canvas"></canvas>
+  <div class="graph-legend" id="graph-legend">
+    <span class="graph-legend-item" onclick="toggleLegend('person')"><span class="graph-legend-dot" style="background:#6D2077"></span>People</span>
+    <span class="graph-legend-item" onclick="toggleLegend('client')"><span class="graph-legend-dot" style="background:#00A4E4"></span>Clients</span>
+    <span class="graph-legend-item" onclick="toggleLegend('team')"><span class="graph-legend-dot" style="background:#8E8E93"></span>Teams</span>
+    <span class="graph-legend-item" onclick="toggleLegend('project')"><span class="graph-legend-dot" style="background:#2ECC71"></span>Projects</span>
+    <span class="graph-legend-item" onclick="toggleLegend('doc')"><span class="graph-legend-dot" style="background:#F39C12"></span>Docs</span>
+    <span class="graph-legend-item" onclick="toggleLegend('external')"><span class="graph-legend-dot" style="background:#E67E22"></span>External</span>
+  </div>
   <div class="graph-controls" id="graph-controls">
     <button class="graph-ctrl-btn" id="layout-toggle" onclick="gToggleLayout()" title="Toggle organized clusters / free orbital">✨ <span class="btn-label">Organize</span></button>
     <button class="graph-ctrl-btn icon-only" onclick="gRecenter()" title="Recenter">⊕</button>
@@ -255,108 +274,166 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 // DATA MODEL — Universal Nodes & Edges
 // ============================================================
 const NODES = [
-  // People
-  {id:'neal',type:'person',name:"Neal Anderson",sub:"Project Coordinator Sr · ITAD Disposal",initials:"NA",color:'#6D2077',you:true,status:'Active',verified:"Apr 12, 2026",verifiedBy:"System",tags:['ITAD','Infrastructure']},
-  {id:'sarah',type:'person',name:"Sarah Chen",sub:"Project Coordinator · ITAD Disposal",initials:"SC",color:'#6D2077',status:'Active',verified:"Apr 11, 2026",verifiedBy:"Neal Anderson",tags:['ITAD','Infrastructure']},
-  {id:'marcus',type:'person',name:"Marcus Webb",sub:"Project Coordinator · ITAD Disposal",initials:"MW",color:'#6D2077',status:'Active',verified:"Apr 10, 2026",verifiedBy:"Neal Anderson",tags:['ITAD','Infrastructure']},
-  {id:'jordan',type:'person',name:"Jordan Blake",sub:"Sales Rep · GTM",initials:"JB",color:'#6D2077',status:'Active',verified:"Apr 8, 2026",verifiedBy:"System",tags:['Sales','GTM']},
-  {id:'lisa',type:'person',name:"Lisa Tran",sub:"Sales Rep · GTM",initials:"LT",color:'#6D2077',status:'Active',verified:"Apr 6, 2026",verifiedBy:"System",tags:['Sales','GTM']},
-  {id:'derek',type:'person',name:"Derek Owens",sub:"Sales Rep · GTM",initials:"DO",color:'#6D2077',status:'Active',verified:"Apr 5, 2026",verifiedBy:"System",tags:['Sales','GTM']},
+  // ─── PEOPLE: NAM ──────────────────────────────────────
+  // Infrastructure / ITAD
+  {id:'neal',type:'person',name:"Neal Anderson",sub:"Project Coordinator Sr · ITAD Disposal · NAM",initials:"NA",color:'#6D2077',you:true,status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 12, 2026",verifiedBy:"System",tags:['ITAD','Infrastructure']},
+  {id:'sarah',type:'person',name:"Sarah Chen",sub:"Project Coordinator · ITAD Disposal · NAM",initials:"SC",color:'#6D2077',status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 11, 2026",verifiedBy:"Neal Anderson",tags:['ITAD','Infrastructure']},
+  {id:'marcus',type:'person',name:"Marcus Webb",sub:"Project Coordinator · ITAD Disposal · NAM",initials:"MW",color:'#6D2077',status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 10, 2026",verifiedBy:"Neal Anderson",tags:['ITAD','Infrastructure']},
+  {id:'priya',type:'person',name:"Priya Sharma",sub:"Team Lead · Managed Services · NAM",initials:"PS",color:'#6D2077',status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 9, 2026",verifiedBy:"System",tags:['ManagedServices','Infrastructure']},
+  {id:'tom',type:'person',name:"Tom Reeves",sub:"Field Services Engineer · NAM",initials:"TR",color:'#6D2077',status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 7, 2026",verifiedBy:"System",tags:['FieldServices','Infrastructure']},
+  // Sales
+  {id:'jordan',type:'person',name:"Jordan Blake",sub:"Sales Rep · Enterprise · NAM",initials:"JB",color:'#6D2077',status:'Active',region:'NAM',dept:'Sales',verified:"Apr 8, 2026",verifiedBy:"System",tags:['Sales','Enterprise']},
+  {id:'lisa',type:'person',name:"Lisa Tran",sub:"Sales Rep · Commercial · NAM",initials:"LT",color:'#6D2077',status:'Active',region:'NAM',dept:'Sales',verified:"Apr 6, 2026",verifiedBy:"System",tags:['Sales','Commercial']},
+  {id:'derek',type:'person',name:"Derek Owens",sub:"Sales Rep · Public Sector · NAM",initials:"DO",color:'#6D2077',status:'Active',region:'NAM',dept:'Sales',verified:"Apr 5, 2026",verifiedBy:"System",tags:['Sales','PublicSector']},
+  {id:'maria',type:'person',name:"Maria Gonzalez",sub:"Sales Director · Enterprise · NAM",initials:"MG",color:'#6D2077',status:'Active',region:'NAM',dept:'Sales',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Sales','Enterprise','Director']},
+  // Cloud & Cyber
+  {id:'kevin',type:'person',name:"Kevin Park",sub:"Cloud Architect · Cloud Services · NAM",initials:"KP",color:'#6D2077',status:'Active',region:'NAM',dept:'Cloud',verified:"Apr 12, 2026",verifiedBy:"System",tags:['Cloud','Azure']},
+  {id:'rachel',type:'person',name:"Rachel Simmons",sub:"Security Engineer · Cybersecurity · NAM",initials:"RS",color:'#6D2077',status:'Active',region:'NAM',dept:'Cybersecurity',verified:"Apr 8, 2026",verifiedBy:"System",tags:['Cybersecurity','Compliance']},
+  {id:'brandon',type:'person',name:"Brandon Cole",sub:"VP, Infrastructure Services · NAM",initials:"BC",color:'#6D2077',status:'Active',region:'NAM',dept:'Infrastructure',verified:"Apr 11, 2026",verifiedBy:"System",tags:['VP','Infrastructure']},
 
-  // Clients
-  {id:'acme',type:'client',name:"Acme Corporation",sub:"Enterprise · Active",color:'#00A4E4',status:'Active',daysStale:2,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Enterprise','Cloud']},
-  {id:'meridian',type:'client',name:"Meridian Health Systems",sub:"Healthcare · Active",color:'#00A4E4',status:'Active',daysStale:5,verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['Healthcare','Compliance']},
-  {id:'techvault',type:'client',name:"TechVault Industries",sub:"Technology · Onboarding",color:'#00A4E4',status:'Onboarding',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Sarah Chen",tags:['Tech','Onboarding']},
-  {id:'pinnacle',type:'client',name:"Pinnacle Financial Group",sub:"Financial Services · Active",color:'#00A4E4',status:'Active',daysStale:12,verified:"Mar 28, 2026",verifiedBy:"Marcus Webb",tags:['Finance','Security']},
-  {id:'redwood',type:'client',name:"Redwood Logistics",sub:"Logistics · Winding Down",color:'#00A4E4',status:'Winding Down',daysStale:45,verified:"Feb 28, 2026",verifiedBy:"Neal Anderson",tags:['Logistics']},
-  {id:'atlas',type:'client',name:"Atlas Manufacturing",sub:"Manufacturing · Active",color:'#00A4E4',status:'Active',daysStale:3,verified:"Apr 10, 2026",verifiedBy:"Sarah Chen",tags:['Manufacturing','IoT']},
-  {id:'beacon',type:'client',name:"Beacon Energy Partners",sub:"Energy · Onboarding",color:'#00A4E4',status:'Onboarding',daysStale:8,verified:"Apr 5, 2026",verifiedBy:"Marcus Webb",tags:['Energy']},
-  {id:'crestline',type:'client',name:"Crestline Retail Corp",sub:"Retail · Active",color:'#00A4E4',status:'Active',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Retail','POS']},
-  {id:'ironbridge',type:'client',name:"Ironbridge Solutions",sub:"Technology · Active",color:'#00A4E4',status:'Active',daysStale:38,verified:"Mar 5, 2026",verifiedBy:"Sarah Chen",tags:['Tech','Cloud']},
-  {id:'northstar',type:'client',name:"Northstar Aerospace",sub:"Aerospace · Onboarding",color:'#00A4E4',status:'Onboarding',daysStale:4,verified:"Apr 9, 2026",verifiedBy:"Marcus Webb",tags:['Aerospace','ITAR']},
-  {id:'silverline',type:'client',name:"Silverline Media Group",sub:"Media · Historical",color:'#00A4E4',status:'Historical',daysStale:62,verified:"Feb 10, 2026",verifiedBy:"Neal Anderson",tags:['Media']},
-  {id:'vanguard',type:'client',name:"Vanguard Disposal Services",sub:"Waste Mgmt · Active",color:'#00A4E4',status:'Active',daysStale:41,verified:"Mar 2, 2026",verifiedBy:"Marcus Webb",tags:['Disposal']},
+  // ─── PEOPLE: EMEA ─────────────────────────────────────
+  {id:'sophie',type:'person',name:"Sophie Laurent",sub:"Project Coordinator · ITAD · EMEA",initials:"SL",color:'#6D2077',status:'Active',region:'EMEA',dept:'Infrastructure',verified:"Apr 7, 2026",verifiedBy:"System",tags:['ITAD','Infrastructure']},
+  {id:'oliver',type:'person',name:"Oliver Kessler",sub:"Sales Rep · Enterprise · EMEA",initials:"OK",color:'#6D2077',status:'Active',region:'EMEA',dept:'Sales',verified:"Apr 4, 2026",verifiedBy:"System",tags:['Sales','Enterprise']},
+  {id:'emma',type:'person',name:"Emma Nakamura-Davis",sub:"Cloud Engineer · EMEA",initials:"EN",color:'#6D2077',status:'Active',region:'EMEA',dept:'Cloud',verified:"Apr 6, 2026",verifiedBy:"System",tags:['Cloud','AWS']},
+  {id:'ahmed',type:'person',name:"Ahmed Hassan",sub:"Service Delivery Lead · EMEA",initials:"AH",color:'#6D2077',status:'Active',region:'EMEA',dept:'Infrastructure',verified:"Apr 3, 2026",verifiedBy:"System",tags:['ServiceDelivery','Infrastructure']},
 
-  // Teams / Groups
-  {id:'team_itad',type:'team',name:"ITAD Disposal",sub:"Infrastructure · 3 members",color:'#6b7280',status:'Active',verified:"Apr 12, 2026",verifiedBy:"System",tags:['Infrastructure']},
-  {id:'team_gtm',type:'team',name:"GTM Sales",sub:"Go-To-Market · 3 members",color:'#6b7280',status:'Active',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Sales']},
-  {id:'dg_east',type:'team',name:"ITAD-Disposal-East",sub:"Distribution Group",color:'#6b7280',status:'Active',verified:"Apr 1, 2026",verifiedBy:"System",tags:['DG']},
-  {id:'dg_central',type:'team',name:"ITAD-Disposal-Central",sub:"Distribution Group",color:'#6b7280',status:'Active',verified:"Apr 1, 2026",verifiedBy:"System",tags:['DG']},
-  {id:'dg_west',type:'team',name:"ITAD-Disposal-West",sub:"Distribution Group",color:'#6b7280',status:'Active',verified:"Apr 1, 2026",verifiedBy:"System",tags:['DG']},
+  // ─── PEOPLE: APAC ─────────────────────────────────────
+  {id:'yuki',type:'person',name:"Yuki Tanaka",sub:"Field Services Lead · APAC",initials:"YT",color:'#6D2077',status:'Active',region:'APAC',dept:'Infrastructure',verified:"Apr 2, 2026",verifiedBy:"System",tags:['FieldServices','Infrastructure']},
+  {id:'raj',type:'person',name:"Raj Patel",sub:"Sales Rep · APAC",initials:"RP",color:'#6D2077',status:'Active',region:'APAC',dept:'Sales',verified:"Apr 1, 2026",verifiedBy:"System",tags:['Sales','APAC']},
 
-  // Projects
-  {id:'proj_acme_q2',type:'project',name:"Acme Cloud Migration Q2",sub:"In Progress · Acme Corp",color:'#16a34a',status:'In Progress',daysStale:2,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Cloud','Migration']},
-  {id:'proj_meridian_refresh',type:'project',name:"Meridian Infra Refresh",sub:"In Progress · Meridian Health",color:'#16a34a',status:'In Progress',daysStale:5,verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['Infrastructure']},
-  {id:'proj_techvault_disc',type:'project',name:"TechVault Discovery",sub:"In Progress · TechVault Industries",color:'#16a34a',status:'In Progress',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Sarah Chen",tags:['Onboarding','Discovery']},
-  {id:'proj_redwood_trans',type:'project',name:"Redwood Transition",sub:"Complete · Redwood Logistics",color:'#16a34a',status:'Complete',daysStale:45,verified:"Feb 28, 2026",verifiedBy:"Neal Anderson",tags:['Transition']},
-  {id:'proj_northstar_deploy',type:'project',name:"Northstar Deployment",sub:"In Progress · Northstar Aerospace",color:'#16a34a',status:'In Progress',daysStale:4,verified:"Apr 9, 2026",verifiedBy:"Marcus Webb",tags:['Deployment','ITAR']},
+  // ─── CLIENTS: NAM ─────────────────────────────────────
+  {id:'acme',type:'client',name:"Acme Corporation",sub:"Enterprise · Cloud · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:2,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Enterprise','Cloud']},
+  {id:'meridian',type:'client',name:"Meridian Health Systems",sub:"Healthcare · Compliance · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:5,verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['Healthcare','Compliance']},
+  {id:'techvault',type:'client',name:"TechVault Industries",sub:"Technology · Onboarding · NAM",color:'#00A4E4',status:'Prospect',region:'NAM',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Sarah Chen",tags:['Tech','Onboarding']},
+  {id:'pinnacle',type:'client',name:"Pinnacle Financial Group",sub:"Financial Services · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:12,verified:"Mar 28, 2026",verifiedBy:"Marcus Webb",tags:['Finance','Security']},
+  {id:'redwood',type:'client',name:"Redwood Logistics",sub:"Logistics · Winding Down · NAM",color:'#00A4E4',status:'Historical',region:'NAM',daysStale:45,verified:"Feb 28, 2026",verifiedBy:"Neal Anderson",tags:['Logistics']},
+  {id:'atlas',type:'client',name:"Atlas Manufacturing",sub:"Manufacturing · IoT · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:3,verified:"Apr 10, 2026",verifiedBy:"Sarah Chen",tags:['Manufacturing','IoT']},
+  {id:'beacon',type:'client',name:"Beacon Energy Partners",sub:"Energy · Prospect · NAM",color:'#00A4E4',status:'Prospect',region:'NAM',daysStale:8,verified:"Apr 5, 2026",verifiedBy:"Marcus Webb",tags:['Energy']},
+  {id:'crestline',type:'client',name:"Crestline Retail Corp",sub:"Retail · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Retail','POS']},
+  {id:'ironbridge',type:'client',name:"Ironbridge Solutions",sub:"Technology · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:38,verified:"Mar 5, 2026",verifiedBy:"Sarah Chen",tags:['Tech','Cloud']},
+  {id:'northstar',type:'client',name:"Northstar Aerospace",sub:"Aerospace · ITAR · NAM",color:'#00A4E4',status:'Prospect',region:'NAM',daysStale:4,verified:"Apr 9, 2026",verifiedBy:"Marcus Webb",tags:['Aerospace','ITAR']},
+  {id:'silverline',type:'client',name:"Silverline Media Group",sub:"Media · Historical · NAM",color:'#00A4E4',status:'Historical',region:'NAM',daysStale:62,verified:"Feb 10, 2026",verifiedBy:"Neal Anderson",tags:['Media']},
+  {id:'vanguard',type:'client',name:"Vanguard Disposal Services",sub:"Waste Mgmt · NAM",color:'#00A4E4',status:'Active',region:'NAM',daysStale:41,verified:"Mar 2, 2026",verifiedBy:"Marcus Webb",tags:['Disposal']},
 
-  // Documents
-  {id:'doc_acme_sow',type:'doc',name:"Acme Master SOW v3",sub:"SOW · Uploaded Apr 8, 2026",color:'#d97706',status:'Current',verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['SOW']},
-  {id:'doc_acme_sla',type:'doc',name:"Acme SLA Agreement 2026",sub:"Contract · Uploaded Jan 15, 2026",color:'#d97706',status:'Current',verified:"Jan 15, 2026",verifiedBy:"Neal Anderson",tags:['Contract']},
-  {id:'doc_meridian_sow',type:'doc',name:"Meridian Healthcare SOW v2",sub:"SOW · Uploaded Mar 30, 2026",color:'#d97706',status:'Current',verified:"Mar 30, 2026",verifiedBy:"Neal Anderson",tags:['SOW','Healthcare']},
-  {id:'doc_techvault_sow',type:'doc',name:"TechVault Onboarding SOW",sub:"SOW · Draft · Uploaded Apr 10, 2026",color:'#d97706',status:'Draft',verified:"Apr 10, 2026",verifiedBy:"Sarah Chen",tags:['SOW','Draft']},
-  {id:'doc_hipaa',type:'doc',name:"HIPAA Compliance Checklist",sub:"Reference · Meridian Health",color:'#d97706',status:'Current',verified:"Feb 28, 2026",verifiedBy:"Marcus Webb",tags:['Compliance','Reference']},
-  {id:'doc_itar',type:'doc',name:"ITAR Compliance Guide",sub:"Reference · Northstar Aerospace",color:'#d97706',status:'Current',verified:"Apr 2, 2026",verifiedBy:"Marcus Webb",tags:['Compliance','Reference','ITAR']},
-  {id:'doc_crestline_pos',type:'doc',name:"Crestline POS Refresh Schedule",sub:"Process Doc · Uploaded Apr 5, 2026",color:'#d97706',status:'Current',verified:"Apr 5, 2026",verifiedBy:"Neal Anderson",tags:['Process','Retail']}
+  // ─── CLIENTS: EMEA ────────────────────────────────────
+  {id:'zenith_eu',type:'client',name:"Zenith Pharma GmbH",sub:"Pharma · EMEA",color:'#00A4E4',status:'Active',region:'EMEA',daysStale:6,verified:"Apr 7, 2026",verifiedBy:"Sophie Laurent",tags:['Pharma','Compliance']},
+  {id:'nordic_tech',type:'client',name:"Nordic Technologies AS",sub:"Technology · EMEA",color:'#00A4E4',status:'Active',region:'EMEA',daysStale:10,verified:"Apr 3, 2026",verifiedBy:"Oliver Kessler",tags:['Tech','Cloud']},
+  {id:'crown_uk',type:'client',name:"Crown Financial UK",sub:"Financial Services · EMEA",color:'#00A4E4',status:'Active',region:'EMEA',daysStale:15,verified:"Mar 29, 2026",verifiedBy:"Ahmed Hassan",tags:['Finance']},
+
+  // ─── CLIENTS: APAC ────────────────────────────────────
+  {id:'pacific_mfg',type:'client',name:"Pacific Manufacturing Ltd",sub:"Manufacturing · APAC",color:'#00A4E4',status:'Active',region:'APAC',daysStale:20,verified:"Mar 24, 2026",verifiedBy:"Yuki Tanaka",tags:['Manufacturing']},
+
+  // ─── TEAMS ────────────────────────────────────────────
+  {id:'team_itad',type:'team',name:"ITAD Disposal",sub:"Infrastructure · NAM · 3 members",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 12, 2026",verifiedBy:"System",tags:['Infrastructure']},
+  {id:'team_managed',type:'team',name:"Managed Services NAM",sub:"Infrastructure · NAM · 2 members",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Infrastructure','ManagedServices']},
+  {id:'team_sales_ent',type:'team',name:"Sales — Enterprise",sub:"Sales · NAM · 2 members",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Sales','Enterprise']},
+  {id:'team_sales_comm',type:'team',name:"Sales — Commercial",sub:"Sales · NAM · 1 member",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Sales','Commercial']},
+  {id:'team_sales_pub',type:'team',name:"Sales — Public Sector",sub:"Sales · NAM · 1 member",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 10, 2026",verifiedBy:"System",tags:['Sales','PublicSector']},
+  {id:'team_cloud',type:'team',name:"Cloud & Data Center",sub:"Cloud Services · NAM · 1 member",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 8, 2026",verifiedBy:"System",tags:['Cloud']},
+  {id:'team_cyber',type:'team',name:"Cybersecurity",sub:"Security · NAM · 1 member",color:'#8E8E93',region:'NAM',status:'Active',verified:"Apr 8, 2026",verifiedBy:"System",tags:['Cybersecurity']},
+  {id:'team_emea',type:'team',name:"EMEA Operations",sub:"Cross-functional · EMEA · 4 members",color:'#8E8E93',region:'EMEA',status:'Active',verified:"Apr 5, 2026",verifiedBy:"System",tags:['EMEA']},
+  {id:'team_apac',type:'team',name:"APAC Field Services",sub:"Infrastructure · APAC · 2 members",color:'#8E8E93',region:'APAC',status:'Active',verified:"Apr 2, 2026",verifiedBy:"System",tags:['APAC','FieldServices']},
+
+  // ─── PROJECTS ────────────────────────────────────────
+  {id:'proj_acme_q2',type:'project',name:"Acme Cloud Migration Q2",sub:"In Progress · Acme Corp",color:'#2ECC71',region:'NAM',status:'In Progress',daysStale:2,verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['Cloud','Migration']},
+  {id:'proj_meridian_refresh',type:'project',name:"Meridian Infra Refresh",sub:"In Progress · Meridian Health",color:'#2ECC71',region:'NAM',status:'In Progress',daysStale:5,verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['Infrastructure']},
+  {id:'proj_techvault_disc',type:'project',name:"TechVault Discovery",sub:"In Progress · TechVault",color:'#2ECC71',region:'NAM',status:'In Progress',daysStale:1,verified:"Apr 12, 2026",verifiedBy:"Sarah Chen",tags:['Onboarding','Discovery']},
+  {id:'proj_redwood_trans',type:'project',name:"Redwood Transition",sub:"Complete · Redwood Logistics",color:'#2ECC71',region:'NAM',status:'Complete',daysStale:45,verified:"Feb 28, 2026",verifiedBy:"Neal Anderson",tags:['Transition']},
+  {id:'proj_northstar_deploy',type:'project',name:"Northstar Deployment",sub:"In Progress · Northstar",color:'#2ECC71',region:'NAM',status:'In Progress',daysStale:4,verified:"Apr 9, 2026",verifiedBy:"Marcus Webb",tags:['Deployment','ITAR']},
+  {id:'proj_zenith_compliance',type:'project',name:"Zenith GDPR Remediation",sub:"In Progress · Zenith Pharma",color:'#2ECC71',region:'EMEA',status:'In Progress',daysStale:6,verified:"Apr 7, 2026",verifiedBy:"Sophie Laurent",tags:['Compliance','GDPR']},
+  {id:'proj_pacific_refresh',type:'project',name:"Pacific Endpoint Refresh",sub:"On Hold · Pacific Mfg",color:'#2ECC71',region:'APAC',status:'On Hold',daysStale:22,verified:"Mar 22, 2026",verifiedBy:"Yuki Tanaka",tags:['Infrastructure','Endpoints']},
+
+  // ─── DOCUMENTS ────────────────────────────────────────
+  {id:'doc_acme_sow',type:'doc',name:"Acme Master SOW v3",sub:"SOW · Apr 8, 2026",color:'#F39C12',status:'Current',region:'NAM',verified:"Apr 8, 2026",verifiedBy:"Neal Anderson",tags:['SOW']},
+  {id:'doc_acme_sla',type:'doc',name:"Acme SLA Agreement 2026",sub:"Contract · Jan 15, 2026",color:'#F39C12',status:'Current',region:'NAM',verified:"Jan 15, 2026",verifiedBy:"Neal Anderson",tags:['Contract']},
+  {id:'doc_meridian_sow',type:'doc',name:"Meridian Healthcare SOW v2",sub:"SOW · Mar 30, 2026",color:'#F39C12',status:'Current',region:'NAM',verified:"Mar 30, 2026",verifiedBy:"Neal Anderson",tags:['SOW','Healthcare']},
+  {id:'doc_techvault_sow',type:'doc',name:"TechVault Onboarding SOW",sub:"SOW · Draft · Apr 10",color:'#F39C12',status:'Under Review',region:'NAM',verified:"Apr 10, 2026",verifiedBy:"Sarah Chen",tags:['SOW','Draft']},
+  {id:'doc_hipaa',type:'doc',name:"HIPAA Compliance Checklist",sub:"Reference · Healthcare",color:'#F39C12',status:'Current',region:'NAM',verified:"Feb 28, 2026",verifiedBy:"Marcus Webb",tags:['Compliance','Reference']},
+  {id:'doc_itar',type:'doc',name:"ITAR Compliance Guide",sub:"Reference · Aerospace",color:'#F39C12',status:'Current',region:'NAM',verified:"Apr 2, 2026",verifiedBy:"Marcus Webb",tags:['Compliance','Reference','ITAR']},
+  {id:'doc_crestline_pos',type:'doc',name:"Crestline POS Refresh Schedule",sub:"Process Doc · Apr 5",color:'#F39C12',status:'Current',region:'NAM',verified:"Apr 5, 2026",verifiedBy:"Neal Anderson",tags:['Process','Retail']},
+  {id:'doc_zenith_gdpr',type:'doc',name:"Zenith GDPR Assessment",sub:"Compliance · EMEA",color:'#F39C12',status:'Under Review',region:'EMEA',verified:"Apr 3, 2026",verifiedBy:"Sophie Laurent",tags:['Compliance','GDPR']},
+
+  // ─── EXTERNAL CONTACTS ────────────────────────────────
+  {id:'ext_warehouse_chi',type:'external',name:"Mike Torres",sub:"Warehouse Ops · Chicago Hub",color:'#E67E22',region:'NAM',status:'Active',verified:"Apr 10, 2026",verifiedBy:"Neal Anderson",tags:['Warehouse','Logistics']},
+  {id:'ext_warehouse_dal',type:'external',name:"Janet Liu",sub:"Warehouse Ops · Dallas Hub",color:'#E67E22',region:'NAM',status:'Active',verified:"Apr 5, 2026",verifiedBy:"Marcus Webb",tags:['Warehouse','Logistics']},
+  {id:'ext_vendor_shred',type:'external',name:"DataShield Destruction Inc.",sub:"Shredding Vendor · NAM",color:'#E67E22',region:'NAM',status:'Active',verified:"Mar 20, 2026",verifiedBy:"Neal Anderson",tags:['Vendor','Destruction']},
+  {id:'ext_acme_pm',type:'external',name:"Janet Williams",sub:"Client PM · Acme Corporation",color:'#E67E22',region:'NAM',status:'Active',verified:"Apr 12, 2026",verifiedBy:"Neal Anderson",tags:['ClientPM']},
+  {id:'ext_emea_logistics',type:'external',name:"Hans Gruber Logistics",sub:"Logistics Partner · EMEA",color:'#E67E22',region:'EMEA',status:'Active',verified:"Mar 28, 2026",verifiedBy:"Sophie Laurent",tags:['Logistics','Partner']}
 ];
 
 const EDGES = [
-  // Person → Client assignments
+  // ─── Person → Client (NAM) ────────────────────────────
   {from:'neal',to:'acme',label:'Coordinator',primary:true},
-  {from:'sarah',to:'acme',label:'Backup'},
-  {from:'jordan',to:'acme',label:'Sales Rep'},
+  {from:'sarah',to:'acme',label:'Backup'},{from:'jordan',to:'acme',label:'Sales Rep'},
+  {from:'kevin',to:'acme',label:'Cloud Architect'},{from:'ext_acme_pm',to:'acme',label:'Client PM'},
   {from:'neal',to:'meridian',label:'Coordinator',primary:true},
-  {from:'marcus',to:'meridian',label:'Backup'},
-  {from:'lisa',to:'meridian',label:'Sales Rep'},
+  {from:'marcus',to:'meridian',label:'Backup'},{from:'lisa',to:'meridian',label:'Sales Rep'},
+  {from:'rachel',to:'meridian',label:'Security Review'},
   {from:'sarah',to:'techvault',label:'Coordinator',primary:true},
-  {from:'neal',to:'techvault',label:'Backup'},
-  {from:'jordan',to:'techvault',label:'Sales Rep'},
+  {from:'neal',to:'techvault',label:'Backup'},{from:'jordan',to:'techvault',label:'Sales Rep'},
   {from:'marcus',to:'pinnacle',label:'Coordinator',primary:true},
-  {from:'sarah',to:'pinnacle',label:'Backup'},
-  {from:'derek',to:'pinnacle',label:'Sales Rep'},
+  {from:'sarah',to:'pinnacle',label:'Backup'},{from:'derek',to:'pinnacle',label:'Sales Rep'},
+  {from:'rachel',to:'pinnacle',label:'Security Review'},
   {from:'neal',to:'redwood',label:'Coordinator',primary:true},
-  {from:'marcus',to:'redwood',label:'Backup'},
-  {from:'lisa',to:'redwood',label:'Sales Rep'},
+  {from:'marcus',to:'redwood',label:'Backup'},{from:'lisa',to:'redwood',label:'Sales Rep'},
   {from:'sarah',to:'atlas',label:'Coordinator',primary:true},
-  {from:'neal',to:'atlas',label:'Backup'},
-  {from:'derek',to:'atlas',label:'Sales Rep'},
+  {from:'neal',to:'atlas',label:'Backup'},{from:'derek',to:'atlas',label:'Sales Rep'},
+  {from:'priya',to:'atlas',label:'Managed Services'},
   {from:'marcus',to:'beacon',label:'Coordinator',primary:true},
-  {from:'sarah',to:'beacon',label:'Backup'},
-  {from:'jordan',to:'beacon',label:'Sales Rep'},
+  {from:'sarah',to:'beacon',label:'Backup'},{from:'jordan',to:'beacon',label:'Sales Rep'},
   {from:'neal',to:'crestline',label:'Coordinator',primary:true},
-  {from:'sarah',to:'crestline',label:'Backup'},
-  {from:'lisa',to:'crestline',label:'Sales Rep'},
+  {from:'sarah',to:'crestline',label:'Backup'},{from:'lisa',to:'crestline',label:'Sales Rep'},
   {from:'sarah',to:'ironbridge',label:'Coordinator',primary:true},
-  {from:'marcus',to:'ironbridge',label:'Backup'},
-  {from:'derek',to:'ironbridge',label:'Sales Rep'},
+  {from:'marcus',to:'ironbridge',label:'Backup'},{from:'derek',to:'ironbridge',label:'Sales Rep'},
+  {from:'kevin',to:'ironbridge',label:'Cloud Architect'},
   {from:'marcus',to:'northstar',label:'Coordinator',primary:true},
-  {from:'neal',to:'northstar',label:'Backup'},
-  {from:'jordan',to:'northstar',label:'Sales Rep'},
+  {from:'neal',to:'northstar',label:'Backup'},{from:'jordan',to:'northstar',label:'Sales Rep'},
   {from:'neal',to:'silverline',label:'Coordinator',primary:true},
-  {from:'sarah',to:'silverline',label:'Backup'},
-  {from:'lisa',to:'silverline',label:'Sales Rep'},
+  {from:'sarah',to:'silverline',label:'Backup'},{from:'lisa',to:'silverline',label:'Sales Rep'},
   {from:'marcus',to:'vanguard',label:'Coordinator',primary:true},
-  {from:'neal',to:'vanguard',label:'Backup'},
-  {from:'derek',to:'vanguard',label:'Sales Rep'},
-  // Person → Team
+  {from:'neal',to:'vanguard',label:'Backup'},{from:'derek',to:'vanguard',label:'Sales Rep'},
+  // Person → Client (EMEA)
+  {from:'sophie',to:'zenith_eu',label:'Coordinator',primary:true},{from:'oliver',to:'zenith_eu',label:'Sales Rep'},
+  {from:'emma',to:'nordic_tech',label:'Cloud Engineer',primary:true},{from:'oliver',to:'nordic_tech',label:'Sales Rep'},
+  {from:'ahmed',to:'crown_uk',label:'Delivery Lead',primary:true},{from:'oliver',to:'crown_uk',label:'Sales Rep'},
+  // Person → Client (APAC)
+  {from:'yuki',to:'pacific_mfg',label:'Field Lead',primary:true},{from:'raj',to:'pacific_mfg',label:'Sales Rep'},
+  // ─── Person → Team ────────────────────────────────────
   {from:'neal',to:'team_itad',label:'Member'},{from:'sarah',to:'team_itad',label:'Member'},{from:'marcus',to:'team_itad',label:'Member'},
-  {from:'jordan',to:'team_gtm',label:'Member'},{from:'lisa',to:'team_gtm',label:'Member'},{from:'derek',to:'team_gtm',label:'Member'},
-  // Client → DG
-  {from:'acme',to:'dg_east',label:'DG'},{from:'meridian',to:'dg_central',label:'DG'},{from:'techvault',to:'dg_west',label:'DG'},
-  {from:'pinnacle',to:'dg_east',label:'DG'},{from:'redwood',to:'dg_west',label:'DG'},{from:'atlas',to:'dg_central',label:'DG'},
-  {from:'beacon',to:'dg_east',label:'DG'},{from:'crestline',to:'dg_central',label:'DG'},{from:'ironbridge',to:'dg_west',label:'DG'},
-  {from:'northstar',to:'dg_east',label:'DG'},{from:'silverline',to:'dg_central',label:'DG'},{from:'vanguard',to:'dg_west',label:'DG'},
-  // Client → Project
+  {from:'priya',to:'team_managed',label:'Lead'},{from:'tom',to:'team_managed',label:'Member'},
+  {from:'jordan',to:'team_sales_ent',label:'Member'},{from:'maria',to:'team_sales_ent',label:'Director'},
+  {from:'lisa',to:'team_sales_comm',label:'Member'},
+  {from:'derek',to:'team_sales_pub',label:'Member'},
+  {from:'kevin',to:'team_cloud',label:'Member'},
+  {from:'rachel',to:'team_cyber',label:'Member'},
+  {from:'brandon',to:'team_itad',label:'VP Oversight'},{from:'brandon',to:'team_managed',label:'VP Oversight'},
+  {from:'sophie',to:'team_emea',label:'Member'},{from:'oliver',to:'team_emea',label:'Member'},
+  {from:'emma',to:'team_emea',label:'Member'},{from:'ahmed',to:'team_emea',label:'Lead'},
+  {from:'yuki',to:'team_apac',label:'Lead'},{from:'raj',to:'team_apac',label:'Member'},
+  // Cross-regional connection
+  {from:'priya',to:'ahmed',label:'Service Delivery Sync'},
+  {from:'brandon',to:'maria',label:'Leadership Review'},
+  // ─── Client → Project ─────────────────────────────────
   {from:'acme',to:'proj_acme_q2',label:'Project'},{from:'meridian',to:'proj_meridian_refresh',label:'Project'},
   {from:'techvault',to:'proj_techvault_disc',label:'Project'},{from:'redwood',to:'proj_redwood_trans',label:'Project'},
   {from:'northstar',to:'proj_northstar_deploy',label:'Project'},
-  // Client → Doc
+  {from:'zenith_eu',to:'proj_zenith_compliance',label:'Project'},
+  {from:'pacific_mfg',to:'proj_pacific_refresh',label:'Project'},
+  // ─── Client → Doc ─────────────────────────────────────
   {from:'acme',to:'doc_acme_sow',label:'SOW'},{from:'acme',to:'doc_acme_sla',label:'Contract'},
   {from:'meridian',to:'doc_meridian_sow',label:'SOW'},{from:'meridian',to:'doc_hipaa',label:'Reference'},
   {from:'techvault',to:'doc_techvault_sow',label:'SOW'},
   {from:'northstar',to:'doc_itar',label:'Reference'},
-  {from:'crestline',to:'doc_crestline_pos',label:'Process Doc'}
+  {from:'crestline',to:'doc_crestline_pos',label:'Process Doc'},
+  {from:'zenith_eu',to:'doc_zenith_gdpr',label:'Compliance'},
+  // ─── External → Client/Team ───────────────────────────
+  {from:'ext_warehouse_chi',to:'team_itad',label:'Warehouse Partner'},
+  {from:'ext_warehouse_dal',to:'team_itad',label:'Warehouse Partner'},
+  {from:'ext_vendor_shred',to:'team_itad',label:'Destruction Vendor'},
+  {from:'ext_acme_pm',to:'acme',label:'Client PM'},
+  {from:'ext_acme_pm',to:'proj_acme_q2',label:'Project PM'},
+  {from:'ext_emea_logistics',to:'team_emea',label:'Logistics Partner'},
+  {from:'ext_emea_logistics',to:'zenith_eu',label:'Logistics'}
 ];
 
 const nodeMap = {};
@@ -368,14 +445,18 @@ const CATEGORIES = [
   {key:'client',label:'Clients',icon:'🏢',count:NODES.filter(n=>n.type==='client').length},
   {key:'team',label:'Teams',icon:'👥',count:NODES.filter(n=>n.type==='team').length},
   {key:'project',label:'Projects',icon:'📌',count:NODES.filter(n=>n.type==='project').length},
-  {key:'doc',label:'Docs',icon:'📄',count:NODES.filter(n=>n.type==='doc').length}
+  {key:'doc',label:'Docs',icon:'📄',count:NODES.filter(n=>n.type==='doc').length},
+  {key:'external',label:'External',icon:'🟠',count:NODES.filter(n=>n.type==='external').length}
 ];
+
+const REGIONS = ['All','NAM','EMEA','APAC'];
 
 // ============================================================
 // STATE
 // ============================================================
 let currentView = 'graph';
 let currentCat = 'all';
+let currentRegion = 'All';
 let searchQuery = '';
 let activeFilters = new Set();
 
@@ -389,23 +470,46 @@ function renderCatTabs() {
 }
 
 function renderFilters() {
-  // Collect unique statuses for current category
   const filtered = getFilteredNodes(true);
   const statuses = [...new Set(filtered.map(n => n.status).filter(Boolean))].sort();
-  document.getElementById('filter-wrap').innerHTML = statuses.map(s =>
+  let html = '';
+  // Region pills
+  html += REGIONS.map(r =>
+    `<button class="filter-chip${currentRegion===r?' active':''}" onclick="setRegion('${r}')">${r==='All'?'🌐 All':r}</button>`
+  ).join('');
+  html += '<span style="width:1px;height:16px;background:var(--card-border);margin:0 4px"></span>';
+  // Status pills
+  html += statuses.map(s =>
     `<button class="filter-chip${activeFilters.has(s)?' active':''}" onclick="toggleFilter('${s}')">${s}</button>`
   ).join('');
+  document.getElementById('filter-wrap').innerHTML = html;
+  // Status summary bar
+  renderStatusBar();
+}
+
+function renderStatusBar() {
+  const list = getFilteredNodes();
+  const counts = {};
+  list.forEach(n => { counts[n.type] = (counts[n.type]||0)+1; });
+  const labels = {person:'People',client:'Clients',team:'Teams',project:'Projects',doc:'Docs',external:'External'};
+  const parts = ['person','client','team','project','doc','external'].filter(t=>counts[t]).map(t=>`${counts[t]} ${labels[t]}`);
+  const staleCount = list.filter(n => n.daysStale && n.daysStale >= 30).length;
+  let bar = `Showing ${list.length} nodes — ${parts.join(' · ')}`;
+  if (staleCount) bar += ` &nbsp;·&nbsp; <span style="color:var(--amber)">⚠️ ${staleCount} need${staleCount===1?'s':''} verification</span>`;
+  document.getElementById('status-bar').innerHTML = bar;
 }
 
 function setCat(cat) { currentCat = cat; activeFilters.clear(); renderCatTabs(); renderFilters(); renderCurrentView(); }
+function setRegion(r) { currentRegion = r; renderFilters(); renderCurrentView(); }
 function toggleFilter(f) { activeFilters.has(f) ? activeFilters.delete(f) : activeFilters.add(f); renderFilters(); renderCurrentView(); }
 
 function getFilteredNodes(ignoreStatus) {
   let list = NODES;
   if (currentCat !== 'all') list = list.filter(n => n.type === currentCat);
+  if (currentRegion !== 'All') list = list.filter(n => n.region === currentRegion);
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    list = list.filter(n => n.name.toLowerCase().includes(q) || (n.sub && n.sub.toLowerCase().includes(q)) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q))));
+    list = list.filter(n => n.name.toLowerCase().includes(q) || (n.sub && n.sub.toLowerCase().includes(q)) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q))) || (n.region && n.region.toLowerCase().includes(q)));
   }
   if (!ignoreStatus && activeFilters.size > 0) list = list.filter(n => activeFilters.has(n.status));
   return list;
@@ -421,6 +525,7 @@ function setView(view, el) {
 
   document.getElementById('graph-canvas').style.display = view === 'graph' ? 'block' : 'none';
   document.getElementById('graph-controls').style.display = view === 'graph' ? 'flex' : 'none';
+  document.getElementById('graph-legend').style.display = view === 'graph' ? 'flex' : 'none';
   document.querySelectorAll('.list-view').forEach(v => v.classList.remove('active'));
   if (view !== 'graph') document.getElementById('view-' + view).classList.add('active');
 
@@ -606,11 +711,12 @@ let gHover = null, gDrag = null, gPan = false, gPanStart = {x:0,y:0,cx:0,cy:0};
 let gSim = true, gAlpha = 1, gTime = 0, gDidInitFit = false;
 let gUserZoomed = false;
 let gLayoutMode = 'orbital'; // 'orbital' (free galaxy) or 'organize' (type clusters)
+let gHiddenTypes = new Set(); // types hidden via legend clicks
 
 // Cluster center positions for organized mode — arranged in a ring
-const gClusterTypes = ['person','client','team','project','doc'];
-const gClusterLabels = {person:'People',client:'Clients',team:'Teams',project:'Projects',doc:'Documents'};
-const gClusterColors = {person:'#6D2077',client:'#00A4E4',team:'#6b7280',project:'#16a34a',doc:'#d97706'};
+const gClusterTypes = ['person','client','team','project','doc','external'];
+const gClusterLabels = {person:'People',client:'Clients',team:'Teams',project:'Projects',doc:'Documents',external:'External'};
+const gClusterColors = {person:'#6D2077',client:'#00A4E4',team:'#8E8E93',project:'#2ECC71',doc:'#F39C12',external:'#E67E22'};
 let gClusterCenters = {};
 
 function gResize() {
@@ -655,11 +761,12 @@ function gScreenToWorld(sx,sy) { return {x:(sx-gW/2)/gCam.zoom+gCam.x, y:(sy-gH/
 function gWorldToScreen(wx,wy) { return {x:(wx-gCam.x)*gCam.zoom+gW/2, y:(wy-gCam.y)*gCam.zoom+gH/2}; }
 
 function gGetAlpha(node) {
+  // Hidden via legend
+  if (gHiddenTypes.has(node.type)) return 0.03;
   const filtered = getFilteredNodes();
   const ids = new Set(filtered.map(n=>n.id));
-  if (currentCat !== 'all' || searchQuery || activeFilters.size) {
+  if (currentCat !== 'all' || currentRegion !== 'All' || searchQuery || activeFilters.size) {
     if (ids.has(node.id)) return Math.max(node.opacity, 0.6);
-    // Show connected to filtered nodes faintly
     const conn = gEdges.some(e => (e.from===node.id && ids.has(e.to)) || (e.to===node.id && ids.has(e.from)));
     return conn ? 0.15 : 0.04;
   }
@@ -828,8 +935,10 @@ function gDraw() {
     gCtx.beginPath();gCtx.arc(s.x,s.y,dr,0,Math.PI*2);gCtx.fillStyle=n.color;gCtx.fill();
     if(n.you){gCtx.strokeStyle='#fff';gCtx.lineWidth=1.5;gCtx.stroke();}
     else if(isHovered){gCtx.strokeStyle='rgba(255,255,255,0.5)';gCtx.lineWidth=1;gCtx.stroke();}
-    // External label — below node
-    const showLabel=isHovered||isConnectedToHover||n.you||r>3;
+    // External label — smart zoom-dependent
+    const isHub = n.connCount >= 3;
+    const zoomedIn = gCam.zoom > 1.2;
+    const showLabel = isHovered || isConnectedToHover || n.you || (isHub && r > 2) || (zoomedIn && r > 2);
     if(showLabel){
       const fs=Math.max(8,Math.min(11,9*gCam.zoom));
       const labelAlpha=isHovered||n.you?1:isConnectedToHover?0.7:Math.min(alpha,0.5+gCam.zoom*0.3);
@@ -867,6 +976,16 @@ function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
 function graphRestart(){gSim=true;gAlpha=0.3;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*2;n.vy+=(Math.random()-0.5)*2;});}
+
+function toggleLegend(type){
+  if(gHiddenTypes.has(type)) gHiddenTypes.delete(type); else gHiddenTypes.add(type);
+  // Update legend UI
+  document.querySelectorAll('.graph-legend-item').forEach(el => {
+    const t = el.textContent.trim().toLowerCase();
+    const typeMap = {people:'person',clients:'client',teams:'team',projects:'project',docs:'doc',external:'external'};
+    if(gHiddenTypes.has(typeMap[t])) el.classList.add('dimmed'); else el.classList.remove('dimmed');
+  });
+}
 
 function gToggleLayout(){
   gLayoutMode = gLayoutMode==='orbital' ? 'organize' : 'orbital';
@@ -930,7 +1049,7 @@ function openDetail(id) {
   const n = nodeMap[id]; if (!n) return;
   const head = document.getElementById('dp-head');
   const body = document.getElementById('dp-body');
-  const typeLabels = {person:'Person',client:'Client',team:'Team / Group',project:'Project',doc:'Document'};
+  const typeLabels = {person:'Person',client:'Client',team:'Team / Group',project:'Project',doc:'Document',external:'External Contact'};
   const sc = getStatusColor(n.status);
 
   head.innerHTML = `<div class="dp-type"><span class="type-dot" style="background:${n.color}"></span>${typeLabels[n.type]||n.type}</div>
@@ -957,8 +1076,9 @@ function openDetail(id) {
   // Details
   html += `<div class="dp-section"><h4>Details</h4>
     <div class="dp-row"><span class="dl">Status</span><span class="dv"><span class="status-chip" style="background:${sc.bg};color:${sc.fg}">${n.status||'—'}</span></span></div>
+    ${n.region?'<div class="dp-row"><span class="dl">Region</span><span class="dv">'+n.region+'</span></div>':''}
     <div class="dp-row"><span class="dl">Connections</span><span class="dv">${n.connCount}</span></div>
-    ${n.daysStale!=null?'<div class="dp-row"><span class="dl">Days Since Update</span><span class="dv">'+n.daysStale+'d</span></div>':''}
+    ${n.daysStale!=null?'<div class="dp-row"><span class="dl">Days Since Update</span><span class="dv">'+(n.daysStale>=60?'🔴 ':n.daysStale>=30?'⚠️ ':'')+n.daysStale+'d</span></div>':''}
     <div class="dp-row"><span class="dl">Verified</span><span class="dv">${n.verified||'—'}</span></div>
     <div class="dp-row"><span class="dl">Verified By</span><span class="dv">${n.verifiedBy||'—'}</span></div>
     ${n.tags?'<div class="dp-row"><span class="dl">Tags</span><span class="dv">'+n.tags.join(', ')+'</span></div>':''}
@@ -986,10 +1106,12 @@ function closeDetail() {
 function getStatusColor(status) {
   const map = {
     'Active':{bg:'rgba(22,163,74,0.12)',fg:'#16a34a'},'In Progress':{bg:'rgba(22,163,74,0.12)',fg:'#16a34a'},
-    'Current':{bg:'rgba(22,163,74,0.12)',fg:'#16a34a'},'Onboarding':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'},
-    'Draft':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'},'Winding Down':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},
+    'Current':{bg:'rgba(22,163,74,0.12)',fg:'#16a34a'},'Prospect':{bg:'rgba(0,164,228,0.12)',fg:'#00A4E4'},
+    'Under Review':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'},'On Hold':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'},
+    'On Leave':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'},
     'Historical':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},'Complete':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},
-    'Archived':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'}
+    'Archived':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},'Offboarded':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},
+    'Dissolved':{bg:'rgba(107,114,128,0.15)',fg:'#6b7280'},'Restructuring':{bg:'rgba(217,119,6,0.12)',fg:'#d97706'}
   };
   return map[status] || {bg:'rgba(107,114,128,0.1)',fg:'#6b7280'};
 }
