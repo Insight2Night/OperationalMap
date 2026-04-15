@@ -645,27 +645,36 @@ function gGetAlpha(node) {
 function gSimulate() {
   if (!gSim) return;
   if (gAlpha < 0.001) { gSim = false; if(gAutoFitPending){gAutoFitPending=false;gRecenter();} return; }
-  gAlpha *= 0.997;
+  gAlpha *= 0.995;
   const a = gAlpha, N = gNodes.length;
-  // Very gentle center gravity toward origin
-  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00005*a; n.vy += (0-n.y)*0.00005*a; });
-  // Node repulsion — inverse-linear (not inverse-square) so it works at distance too
+  // Gentle center gravity toward origin
+  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00004*a; n.vy += (0-n.y)*0.00004*a; });
+  // Node repulsion — inverse-square but with soft minimum and force cap
   for (let i=0;i<N;i++) for (let j=i+1;j<N;j++) {
-    const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    // repulsion = k/d — linear falloff keeps nodes from collapsing
-    const f=-200*a/Math.max(d,30),fx=(dx/d)*f,fy=(dy/d)*f;
-    if(A!==gDrag){A.vx-=fx;A.vy-=fy;} if(B!==gDrag){B.vx+=fx;B.vy+=fy;}
+    const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d2=dx*dx+dy*dy;
+    const d=Math.sqrt(d2)||1;
+    const safeDist=Math.max(d,80);
+    const f=Math.min(4000*a/(safeDist*safeDist), 1.5*a); // capped repulsion
+    const fx=(dx/d)*f,fy=(dy/d)*f;
+    if(A!==gDrag){A.vx+=fx;A.vy+=fy;} if(B!==gDrag){B.vx-=fx;B.vy-=fy;}
   }
-  // Edge springs — capped force so distant connected nodes don't collapse violently
+  // Edge springs — gentle pull, capped
   gEdges.forEach(e => {
     const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
     const ideal=e.a.type===e.b.type?180:260;
-    const rawF=(d-ideal)*0.0004*a;
-    const f=Math.sign(rawF)*Math.min(Math.abs(rawF),2*a); // cap spring force
+    const rawF=(d-ideal)*0.0003*a;
+    const f=Math.sign(rawF)*Math.min(Math.abs(rawF),1.2*a);
     const fx=(dx/d)*f,fy=(dy/d)*f;
     if(e.a!==gDrag){e.a.vx+=fx;e.a.vy+=fy;} if(e.b!==gDrag){e.b.vx-=fx;e.b.vy-=fy;}
   });
-  gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.8;n.vy*=0.8;n.x+=n.vx;n.y+=n.vy; });
+  // Apply velocity with strong damping + speed cap
+  gNodes.forEach(n => {
+    if(n===gDrag){n.vx=0;n.vy=0;return;}
+    n.vx*=0.6; n.vy*=0.6;
+    const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+    if(spd>8){const s=8/spd;n.vx*=s;n.vy*=s;}
+    n.x+=n.vx; n.y+=n.vy;
+  });
   // Auto-fit periodically during simulation warm-up
   if(gAutoFitPending){gAutoFitFrame++;if(gAutoFitFrame%30===0)gRecenter();}
 }
