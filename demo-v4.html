@@ -55,7 +55,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
 /* VIEW TOGGLE */
 .view-toggle{display:flex;gap:2px;background:var(--bg-light);border-radius:8px;padding:3px;border:1px solid var(--card-border);margin-left:auto}
-.view-btn{width:30px;height:28px;border-radius:6px;cursor:pointer;border:none;background:transparent;color:var(--text-dim);transition:var(--transition);font-size:14px;display:flex;align-items:center;justify-content:center}
+.view-btn{padding:4px 10px;border-radius:6px;cursor:pointer;border:none;background:transparent;color:var(--text-dim);transition:var(--transition);font-size:11px;display:flex;align-items:center;justify-content:center;gap:4px;font-family:inherit;font-weight:600;white-space:nowrap}
 .view-btn:hover{color:var(--text-muted)}
 .view-btn.active{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.2)}
 
@@ -213,11 +213,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="cat-tabs" id="cat-tabs"></div>
     <div class="filter-wrap" id="filter-wrap"></div>
     <div class="view-toggle">
-      <button class="view-btn active" data-view="graph" onclick="setView('graph',this)" title="Graph">🕸️</button>
-      <button class="view-btn" data-view="cards" onclick="setView('cards',this)" title="Cards">🃏</button>
-      <button class="view-btn" data-view="table" onclick="setView('table',this)" title="Table">📋</button>
-      <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️</button>
-      <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝</button>
+      <button class="view-btn active" data-view="graph" onclick="setView('graph',this)" title="Graph">🕸️ Graph</button>
+      <button class="view-btn" data-view="cards" onclick="setView('cards',this)" title="Cards">🃏 Cards</button>
+      <button class="view-btn" data-view="table" onclick="setView('table',this)" title="Table">📋 Table</button>
+      <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️ Tree</button>
+      <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝 Text</button>
     </div>
   </div>
 </div>
@@ -645,22 +645,24 @@ function gGetAlpha(node) {
 function gSimulate() {
   if (!gSim) return;
   if (gAlpha < 0.001) { gSim = false; if(gAutoFitPending){gAutoFitPending=false;gRecenter();} return; }
-  gAlpha *= 0.996;
+  gAlpha *= 0.997;
   const a = gAlpha, N = gNodes.length;
-  // Very gentle center gravity toward origin (world 0,0)
-  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00008*a; n.vy += (0-n.y)*0.00008*a; });
-  // Strong node repulsion — keeps everything spread out
+  // Very gentle center gravity toward origin
+  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00005*a; n.vy += (0-n.y)*0.00005*a; });
+  // Node repulsion — inverse-linear (not inverse-square) so it works at distance too
   for (let i=0;i<N;i++) for (let j=i+1;j<N;j++) {
     const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    if(d<120)d=120;
-    const f=-8000*a/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;
+    // repulsion = k/d — linear falloff keeps nodes from collapsing
+    const f=-200*a/Math.max(d,30),fx=(dx/d)*f,fy=(dy/d)*f;
     if(A!==gDrag){A.vx-=fx;A.vy-=fy;} if(B!==gDrag){B.vx+=fx;B.vy+=fy;}
   }
-  // Edge springs — pull connected nodes together, type-aware ideal distances
+  // Edge springs — capped force so distant connected nodes don't collapse violently
   gEdges.forEach(e => {
     const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const ideal=e.a.type===e.b.type?180:280;
-    const f=(d-ideal)*0.0005*a,fx=(dx/d)*f,fy=(dy/d)*f;
+    const ideal=e.a.type===e.b.type?180:260;
+    const rawF=(d-ideal)*0.0004*a;
+    const f=Math.sign(rawF)*Math.min(Math.abs(rawF),2*a); // cap spring force
+    const fx=(dx/d)*f,fy=(dy/d)*f;
     if(e.a!==gDrag){e.a.vx+=fx;e.a.vy+=fy;} if(e.b!==gDrag){e.b.vx-=fx;e.b.vy-=fy;}
   });
   gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.8;n.vy*=0.8;n.x+=n.vx;n.y+=n.vy; });
