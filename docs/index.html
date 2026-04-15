@@ -73,8 +73,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 #graph-canvas:active{cursor:grabbing}
 #graph-canvas.hovering{cursor:pointer}
 .graph-controls{position:absolute;bottom:16px;right:16px;display:flex;gap:6px;z-index:10}
-.graph-ctrl-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--card-border);background:rgba(28,35,51,0.85);backdrop-filter:blur(8px);color:var(--text-muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.graph-ctrl-btn{height:32px;border-radius:8px;border:1px solid var(--card-border);background:rgba(28,35,51,0.85);backdrop-filter:blur(8px);color:var(--text-muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:var(--transition);padding:0 10px;gap:5px;font-family:inherit}
+.graph-ctrl-btn.icon-only{width:32px;padding:0}
 .graph-ctrl-btn:hover{border-color:var(--purple);color:var(--purple-light);background:rgba(28,35,51,0.95)}
+.graph-ctrl-btn.active{border-color:var(--purple);color:var(--purple-light);background:rgba(109,32,119,0.15)}
+.graph-ctrl-btn .btn-label{font-size:10px;font-weight:600;letter-spacing:0.3px}
 
 /* LIST VIEWS (Table, Cards, Tree) */
 .list-view{position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;padding:20px 24px;display:none}
@@ -226,9 +229,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="main" id="main-area">
   <canvas id="graph-canvas"></canvas>
   <div class="graph-controls" id="graph-controls">
-    <button class="graph-ctrl-btn" onclick="gRecenter()" title="Recenter">⊕</button>
-    <button class="graph-ctrl-btn" onclick="gZoomIn()" title="Zoom In">+</button>
-    <button class="graph-ctrl-btn" onclick="gZoomOut()" title="Zoom Out">−</button>
+    <button class="graph-ctrl-btn" id="layout-toggle" onclick="gToggleLayout()" title="Toggle organized clusters / free orbital">✨ <span class="btn-label">Organize</span></button>
+    <button class="graph-ctrl-btn icon-only" onclick="gRecenter()" title="Recenter">⊕</button>
+    <button class="graph-ctrl-btn icon-only" onclick="gZoomIn()" title="Zoom In">+</button>
+    <button class="graph-ctrl-btn icon-only" onclick="gZoomOut()" title="Zoom Out">−</button>
   </div>
   <div class="list-view" id="view-cards"></div>
   <div class="list-view" id="view-table"></div>
@@ -600,7 +604,14 @@ let gEdges = [];
 let gCam = {x:0,y:0,zoom:1,tX:0,tY:0,tZ:1};
 let gHover = null, gDrag = null, gPan = false, gPanStart = {x:0,y:0,cx:0,cy:0};
 let gSim = true, gAlpha = 1, gTime = 0, gDidInitFit = false;
-let gUserZoomed = false; // once user zooms/pans, stop auto-fitting
+let gUserZoomed = false;
+let gLayoutMode = 'orbital'; // 'orbital' (free galaxy) or 'organize' (type clusters)
+
+// Cluster center positions for organized mode — arranged in a ring
+const gClusterTypes = ['person','client','team','project','doc'];
+const gClusterLabels = {person:'People',client:'Clients',team:'Teams',project:'Projects',doc:'Documents'};
+const gClusterColors = {person:'#6D2077',client:'#00A4E4',team:'#6b7280',project:'#16a34a',doc:'#d97706'};
+let gClusterCenters = {};
 
 function gResize() {
   const rect = gCanvas.parentElement.getBoundingClientRect();
@@ -615,7 +626,6 @@ function gBuild() {
   // Place nodes in world space centered at 0,0 with wide initial spread
   const spread = Math.max(gW, gH) * 1.2;
   gNodes = NODES.map(n => {
-    // Radius scales with connection count — hubs are larger
     const r = 3 + Math.sqrt(n.connCount) * 2.5;
     return {...n, x: (Math.random()-0.5)*spread, y: (Math.random()-0.5)*spread*0.7,
       vx:0, vy:0, radius: r, baseRadius: r,
@@ -625,11 +635,20 @@ function gBuild() {
   });
   const gNodeMap = {}; gNodes.forEach(n => gNodeMap[n.id] = n);
   gEdges = EDGES.map(e => ({...e, a: gNodeMap[e.from], b: gNodeMap[e.to]})).filter(e => e.a && e.b);
-  // Place "you" at origin
   const youN = gNodes.find(n => n.you);
   if (youN) { youN.x = 0; youN.y = 0; }
   gCam.x = gCam.tX = 0; gCam.y = gCam.tY = 0;
   gDidInitFit = false; gUserZoomed = false;
+  gComputeClusterCenters();
+}
+
+function gComputeClusterCenters() {
+  // Arrange type clusters in a ring
+  const clusterR = Math.min(gW, gH) * 0.6;
+  gClusterTypes.forEach((type, i) => {
+    const angle = (i / gClusterTypes.length) * Math.PI * 2 - Math.PI/2;
+    gClusterCenters[type] = { x: Math.cos(angle) * clusterR, y: Math.sin(angle) * clusterR };
+  });
 }
 
 function gScreenToWorld(sx,sy) { return {x:(sx-gW/2)/gCam.zoom+gCam.x, y:(sy-gH/2)/gCam.zoom+gCam.y}; }
@@ -656,20 +675,25 @@ function gSimulate() {
   }
   gAlpha *= 0.992;
   const N = gNodes.length;
+  const organized = gLayoutMode === 'organize';
 
   // 1. Reset forces
   gNodes.forEach(n => { n.fx = 0; n.fy = 0; });
 
-  // 2. Very gentle center gravity (prevents drift, doesn't collapse)
+  // 2. Gravity — either toward origin (orbital) or cluster centers (organize)
   gNodes.forEach(n => {
     if (n===gDrag) return;
-    const dist = Math.sqrt(n.x*n.x + n.y*n.y) || 1;
-    n.fx -= n.x * 0.00003;
-    n.fy -= n.y * 0.00003;
+    if (organized) {
+      const cc = gClusterCenters[n.type] || {x:0,y:0};
+      n.fx += (cc.x - n.x) * 0.008;
+      n.fy += (cc.y - n.y) * 0.008;
+    } else {
+      n.fx -= n.x * 0.00003;
+      n.fy -= n.y * 0.00003;
+    }
   });
 
-  // 3. Node-node repulsion — Coulomb-like with soft minimum
-  // Uses k/d for distances < threshold (strong close), k/d² for far (quick falloff)
+  // 3. Node-node repulsion
   for (let i=0;i<N;i++) {
     const A=gNodes[i];
     for (let j=i+1;j<N;j++) {
@@ -677,37 +701,33 @@ function gSimulate() {
       const dx=B.x-A.x, dy=B.y-A.y;
       let d=Math.sqrt(dx*dx+dy*dy)||0.1;
       const minDist = (A.radius + B.radius) * 4;
-      // Strong short-range, fading long-range
       let force;
       if (d < minDist) {
-        // Hard push at close range (prevents overlap)
         force = 5 / Math.max(d/minDist, 0.1);
       } else {
-        // Gentle long-range repulsion
-        force = 2000 / (d * d);
+        force = (organized ? 1200 : 2000) / (d * d);
       }
-      force = Math.min(force, 4); // absolute cap
+      force = Math.min(force, 4);
       const ux=dx/d, uy=dy/d;
       if(A!==gDrag){A.fx-=ux*force;A.fy-=uy*force;}
       if(B!==gDrag){B.fx+=ux*force;B.fy+=uy*force;}
     }
   }
 
-  // 4. Edge springs — Hooke's law, gently pulls connected nodes together
+  // 4. Edge springs
   gEdges.forEach(e => {
     const dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, d=Math.sqrt(dx*dx+dy*dy)||0.1;
-    const ideal = e.a.type===e.b.type ? 150 : 220;
-    const displacement = d - ideal;
-    // Spring stiffness — weaker when far (prevents violent snapping)
-    const stiffness = 0.003;
-    let force = displacement * stiffness;
-    force = Math.sign(force) * Math.min(Math.abs(force), 1.5); // cap
+    const sameType = e.a.type===e.b.type;
+    const ideal = organized ? (sameType ? 80 : 300) : (sameType ? 150 : 220);
+    const stiffness = organized ? (sameType ? 0.005 : 0.001) : 0.003;
+    let force = (d - ideal) * stiffness;
+    force = Math.sign(force) * Math.min(Math.abs(force), 1.5);
     const ux=dx/d, uy=dy/d;
     if(e.a!==gDrag){e.a.fx+=ux*force;e.a.fy+=uy*force;}
     if(e.b!==gDrag){e.b.fx-=ux*force;e.b.fy-=uy*force;}
   });
 
-  // 5. Hover expansion — push neighbors of hovered node outward
+  // 5. Hover expansion
   if (gHover && !gDrag) {
     gEdges.forEach(e => {
       let neighbor = null;
@@ -724,7 +744,7 @@ function gSimulate() {
     });
   }
 
-  // 6. Apply forces with alpha scaling, damping, and speed limit
+  // 6. Apply forces
   gNodes.forEach(n => {
     if(n===gDrag){n.vx=0;n.vy=0;return;}
     n.vx = (n.vx + n.fx * gAlpha) * 0.65;
@@ -735,7 +755,7 @@ function gSimulate() {
     n.y += n.vy;
   });
 
-  // 7. Collision resolution pass — hard overlap prevention
+  // 7. Collision resolution
   for (let iter=0;iter<2;iter++) {
     for (let i=0;i<N;i++) {
       const A=gNodes[i];
@@ -761,6 +781,28 @@ function gDraw() {
   // Subtle grid dots
   const gs=50*gCam.zoom;
   if(gs>8){gCtx.fillStyle='rgba(45,53,72,0.12)';const ox=(gW/2-gCam.x*gCam.zoom)%gs,oy=(gH/2-gCam.y*gCam.zoom)%gs;for(let x=ox;x<gW;x+=gs)for(let y=oy;y<gH;y+=gs){gCtx.beginPath();gCtx.arc(x,y,0.5,0,Math.PI*2);gCtx.fill();}}
+
+  // Cluster zones (organize mode) — soft rings with labels
+  if(gLayoutMode==='organize'){
+    gClusterTypes.forEach(type=>{
+      const cc=gClusterCenters[type];if(!cc)return;
+      const s=gWorldToScreen(cc.x,cc.y);
+      const zoneR=120*gCam.zoom;
+      // Soft ring
+      gCtx.beginPath();gCtx.arc(s.x,s.y,zoneR,0,Math.PI*2);
+      gCtx.strokeStyle=gClusterColors[type]||'#6b7280';gCtx.globalAlpha=0.08;gCtx.lineWidth=1;gCtx.stroke();
+      // Fill hint
+      const grd=gCtx.createRadialGradient(s.x,s.y,0,s.x,s.y,zoneR);
+      grd.addColorStop(0,(gClusterColors[type]||'#6b7280')+'0A');grd.addColorStop(1,'transparent');
+      gCtx.fillStyle=grd;gCtx.globalAlpha=0.15;gCtx.fill();
+      // Label
+      gCtx.globalAlpha=0.35;gCtx.font='700 11px Inter,sans-serif';gCtx.textAlign='center';gCtx.textBaseline='middle';
+      gCtx.fillStyle=gClusterColors[type]||'#6b7280';
+      gCtx.fillText(gClusterLabels[type]||type,s.x,s.y-zoneR-10);
+      gCtx.globalAlpha=1;
+    });
+  }
+
   // Edges — thin lines like Obsidian
   gEdges.forEach(e => {
     const sa=gWorldToScreen(e.a.x,e.a.y),sb=gWorldToScreen(e.b.x,e.b.y);
@@ -825,6 +867,24 @@ function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
 function graphRestart(){gSim=true;gAlpha=0.3;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*2;n.vy+=(Math.random()-0.5)*2;});}
+
+function gToggleLayout(){
+  gLayoutMode = gLayoutMode==='orbital' ? 'organize' : 'orbital';
+  const btn = document.getElementById('layout-toggle');
+  if(gLayoutMode==='organize'){
+    btn.innerHTML='\uD83C\uDF0C <span class="btn-label">Orbital</span>';
+    btn.classList.add('active');
+  } else {
+    btn.innerHTML='\u2728 <span class="btn-label">Organize</span>';
+    btn.classList.remove('active');
+  }
+  // Re-fire simulation to animate the transition
+  gSim=true; gAlpha=Math.max(gAlpha,0.6);
+  gUserZoomed=false;
+  gNodes.forEach(n=>{n.vx*=0.3;n.vy*=0.3;});
+  // Auto-fit after transition settles
+  gDidInitFit=false;
+}
 
 function gRecenter(){
   if(!gNodes.length)return;
