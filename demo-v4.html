@@ -125,6 +125,21 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .tree-item .ti-name{font-weight:600;flex:1}
 .tree-item .ti-meta{color:var(--text-dim);font-size:11px;display:flex;align-items:center;gap:6px}
 
+/* TEXT VIEW */
+.text-view{padding-bottom:40px;max-width:800px}
+.tv-section{margin-bottom:28px}
+.tv-heading{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--card-border);display:flex;align-items:center;gap:6px}
+.tv-entry{padding:12px 14px;border-radius:8px;cursor:pointer;transition:var(--transition);margin-bottom:4px;border-left:3px solid transparent}
+.tv-entry:hover{background:rgba(109,32,119,0.05);border-left-color:var(--purple)}
+.tv-name{font-size:13px;display:flex;align-items:center;gap:8px}
+.tv-sub{font-size:11px;color:var(--text-muted);margin:3px 0 0 14px}
+.tv-meta{font-size:10px;color:var(--text-dim);margin:4px 0 0 14px}
+.tv-conns{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 0 14px}
+.tv-conn-tag{font-size:10px;color:var(--text-muted);background:var(--bg-light);border:1px solid var(--card-border);padding:2px 8px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:var(--transition)}
+.tv-conn-tag:hover{border-color:var(--purple);color:var(--purple-light)}
+.tv-tags{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0 14px}
+.tv-tag{font-size:10px;color:var(--text-dim);font-weight:500}
+
 /* DETAIL PANEL */
 .detail-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:50}
 .detail-overlay.show{display:block}
@@ -202,6 +217,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="view-btn" data-view="cards" onclick="setView('cards',this)" title="Cards">🃏</button>
       <button class="view-btn" data-view="table" onclick="setView('table',this)" title="Table">📋</button>
       <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️</button>
+      <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝</button>
     </div>
   </div>
 </div>
@@ -217,6 +233,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="list-view" id="view-cards"></div>
   <div class="list-view" id="view-table"></div>
   <div class="list-view" id="view-tree"></div>
+  <div class="list-view" id="view-text"></div>
 </div>
 
 <!-- DETAIL PANEL -->
@@ -399,6 +416,7 @@ function setView(view, el) {
   if (el) el.classList.add('active');
 
   document.getElementById('graph-canvas').style.display = view === 'graph' ? 'block' : 'none';
+  document.getElementById('graph-controls').style.display = view === 'graph' ? 'flex' : 'none';
   document.querySelectorAll('.list-view').forEach(v => v.classList.remove('active'));
   if (view !== 'graph') document.getElementById('view-' + view).classList.add('active');
 
@@ -409,6 +427,7 @@ function renderCurrentView() {
   if (currentView === 'cards') renderCards();
   else if (currentView === 'table') renderTable();
   else if (currentView === 'tree') renderTree();
+  else if (currentView === 'text') renderText();
   else if (currentView === 'graph') graphRestart();
 }
 
@@ -521,6 +540,56 @@ function renderTree() {
 }
 
 // ============================================================
+// TEXT VIEW
+// ============================================================
+function renderText() {
+  const list = getFilteredNodes();
+  if (!list.length) { document.getElementById('view-text').innerHTML = '<div class="no-results"><div class="nr-icon">🔍</div><p>No results.</p></div>'; return; }
+
+  const typeLabels = {person:'People',client:'Clients',team:'Teams & Groups',project:'Projects',doc:'Documents'};
+  const typeIcons = {person:'👤',client:'🏢',team:'👥',project:'📌',doc:'📄'};
+  const order = ['person','client','team','project','doc'];
+  const groups = {};
+  list.forEach(n => { (groups[n.type] = groups[n.type] || []).push(n); });
+
+  let html = '<div class="text-view">';
+  order.forEach(type => {
+    const items = groups[type];
+    if (!items || !items.length) return;
+    html += `<div class="tv-section"><h3 class="tv-heading">${typeIcons[type]} ${typeLabels[type]}</h3>`;
+    items.forEach(n => {
+      const conns = EDGES.filter(e => e.from === n.id || e.to === n.id);
+      const sc = getStatusColor(n.status);
+      const staleStr = n.daysStale != null ? ` · Updated ${n.daysStale}d ago` : '';
+      const verStr = n.verified ? `✅ Verified ${n.verified}` : '⏳ Unverified';
+
+      html += `<div class="tv-entry" onclick="openDetail('${n.id}')">`;
+      html += `<div class="tv-name"><span class="type-dot" style="background:${n.color}"></span><strong>${n.name}</strong>`;
+      html += ` <span class="status-chip" style="background:${sc.bg};color:${sc.fg};font-size:9px;padding:1px 6px">${n.status||''}</span></div>`;
+      if (n.sub) html += `<div class="tv-sub">${n.sub}</div>`;
+      html += `<div class="tv-meta">${verStr}${staleStr} · ${conns.length} connection${conns.length!==1?'s':''}</div>`;
+
+      if (conns.length) {
+        html += '<div class="tv-conns">';
+        conns.forEach(e => {
+          const otherId = e.from === n.id ? e.to : e.from;
+          const other = nodeMap[otherId]; if (!other) return;
+          html += `<span class="tv-conn-tag" onclick="event.stopPropagation();openDetail('${otherId}')"><span class="type-dot" style="background:${other.color};width:6px;height:6px"></span>${other.name}${e.label?' · '+e.label:''}</span>`;
+        });
+        html += '</div>';
+      }
+      if (n.tags && n.tags.length) {
+        html += '<div class="tv-tags">' + n.tags.map(t => `<span class="tv-tag">#${t}</span>`).join('') + '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('view-text').innerHTML = html;
+}
+
+// ============================================================
 // GRAPH VIEW (Canvas)
 // ============================================================
 const gCanvas = document.getElementById('graph-canvas');
@@ -530,7 +599,7 @@ let gNodes = [];
 let gEdges = [];
 let gCam = {x:0,y:0,zoom:1,tX:0,tY:0,tZ:1};
 let gHover = null, gDrag = null, gPan = false, gPanStart = {x:0,y:0,cx:0,cy:0};
-let gSim = true, gAlpha = 1, gTime = 0;
+let gSim = true, gAlpha = 1, gTime = 0, gAutoFitPending = false, gAutoFitFrame = 0;
 
 function gResize() {
   const rect = gCanvas.parentElement.getBoundingClientRect();
@@ -542,16 +611,20 @@ function gResize() {
 }
 
 function gBuild() {
-  gNodes = NODES.map(n => ({...n, x: gW/2 + (Math.random()-0.5)*600, y: gH/2 + (Math.random()-0.5)*400,
+  // Place nodes in world space centered at 0,0 with wide initial spread
+  const spread = Math.max(gW, gH) * 0.8;
+  gNodes = NODES.map(n => ({...n, x: (Math.random()-0.5)*spread, y: (Math.random()-0.5)*spread*0.7,
     vx:0, vy:0, radius: 4 + Math.min(n.connCount * 0.8, 4),
     glow: n.type==='person'?'rgba(109,32,119,0.4)':n.type==='client'?'rgba(0,164,228,0.35)':n.type==='project'?'rgba(22,163,74,0.3)':n.type==='doc'?'rgba(217,119,6,0.3)':'rgba(107,114,128,0.2)',
     opacity: n.daysStale != null ? (n.daysStale < 30 ? 1 : n.daysStale < 60 ? 0.55 : 0.3) : (n.status==='Historical'?0.35:0.9)
   }));
   const gNodeMap = {}; gNodes.forEach(n => gNodeMap[n.id] = n);
   gEdges = EDGES.map(e => ({...e, a: gNodeMap[e.from], b: gNodeMap[e.to]})).filter(e => e.a && e.b);
-  // Center "you"
+  // Place "you" at origin
   const youN = gNodes.find(n => n.you);
-  if (youN) { youN.x = gW/2; youN.y = gH/2; gCam.x = gCam.tX = youN.x; gCam.y = gCam.tY = youN.y; }
+  if (youN) { youN.x = 0; youN.y = 0; }
+  gCam.x = gCam.tX = 0; gCam.y = gCam.tY = 0;
+  gAutoFitPending = true;
 }
 
 function gScreenToWorld(sx,sy) { return {x:(sx-gW/2)/gCam.zoom+gCam.x, y:(sy-gH/2)/gCam.zoom+gCam.y}; }
@@ -571,26 +644,28 @@ function gGetAlpha(node) {
 
 function gSimulate() {
   if (!gSim) return;
-  if (gAlpha < 0.001) { gSim = false; return; }
-  gAlpha *= 0.995;
-  const a = gAlpha, N = gNodes.length, cx = gW/2, cy = gH/2;
-  // Gentle center gravity
-  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (cx-n.x)*0.00015*a; n.vy += (cy-n.y)*0.00015*a; });
-  // Node repulsion — strong enough for spacing with small nodes
+  if (gAlpha < 0.001) { gSim = false; if(gAutoFitPending){gAutoFitPending=false;gRecenter();} return; }
+  gAlpha *= 0.996;
+  const a = gAlpha, N = gNodes.length;
+  // Very gentle center gravity toward origin (world 0,0)
+  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00008*a; n.vy += (0-n.y)*0.00008*a; });
+  // Strong node repulsion — keeps everything spread out
   for (let i=0;i<N;i++) for (let j=i+1;j<N;j++) {
     const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const min=60; if(d<min)d=min;
-    const f=-3000*a/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;
+    if(d<120)d=120;
+    const f=-8000*a/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;
     if(A!==gDrag){A.vx-=fx;A.vy-=fy;} if(B!==gDrag){B.vx+=fx;B.vy+=fy;}
   }
-  // Connected nodes pull together with type-aware clustering
+  // Edge springs — pull connected nodes together, type-aware ideal distances
   gEdges.forEach(e => {
     const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const ideal=e.a.type===e.b.type?140:200;
-    const f=(d-ideal)*0.0008*a,fx=(dx/d)*f,fy=(dy/d)*f;
+    const ideal=e.a.type===e.b.type?180:280;
+    const f=(d-ideal)*0.0005*a,fx=(dx/d)*f,fy=(dy/d)*f;
     if(e.a!==gDrag){e.a.vx+=fx;e.a.vy+=fy;} if(e.b!==gDrag){e.b.vx-=fx;e.b.vy-=fy;}
   });
-  gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy; });
+  gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.8;n.vy*=0.8;n.x+=n.vx;n.y+=n.vy; });
+  // Auto-fit periodically during simulation warm-up
+  if(gAutoFitPending){gAutoFitFrame++;if(gAutoFitFrame%30===0)gRecenter();}
 }
 
 function gDraw() {
@@ -662,7 +737,7 @@ function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1
 
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
-function graphRestart(){gSim=true;gAlpha=0.4;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*3;n.vy+=(Math.random()-0.5)*3;});}
+function graphRestart(){gSim=true;gAlpha=0.4;gAutoFitPending=true;gAutoFitFrame=0;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*3;n.vy+=(Math.random()-0.5)*3;});}
 
 function gRecenter(){
   // Fit all visible nodes in view
