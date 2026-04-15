@@ -12,24 +12,25 @@ A living org map — browse by people or by client, see every connection, verify
 
 Open in any browser. No install, no dependencies. Click through everything — toggle views, expand nodes, drill into assignments, verify connections.
 
-To run locally: open `demo-map.html` in a browser.
+To run locally: open `demo-graph.html` in a browser.
 
 ---
 
 ## What This Is
 
-One search. Two views. Every connection.
+An Obsidian-style interactive graph of people, clients, and connections — alive, accountable, and AI-readable.
 
-- **Client View** — expand any client to see every person connected to it, their role, and verification status
-- **People View** — expand any person to see every client they're assigned to
-- **Drill down** — click any connection to see who assigned it, when, and who verified it
-- **Verify / Edit / Request** — anyone can suggest changes, approvers verify, everything traceable
+- **Graph View** — force-directed constellation of nodes. People, clients, external contacts, and DG groups as interconnected nodes. Drag, zoom, explore. Stale nodes fade. Verified nodes glow.
+- **Tree View** — clean structured layout of the same data for focused lookup
+- **Click any node** — detail panel with every connection, verification status, audit trail
+- **Search** — type a name, the graph flies to that node
+- **Verify / Edit** — anyone can suggest changes, approvers verify, everything traceable
 
 ### The Core Idea
 
-> Anyone can update. Only certain people verify. Everything is traceable.
+> You open it and YOU are at the center. Your clients radiate outward. Stale connections fade. Verified connections glow. The health of your operational world is visible at a glance.
 
-This is how you get company-wide participation without chaos.
+Anyone can update. Only certain people verify. Everything is traceable.
 
 ---
 
@@ -68,8 +69,9 @@ The map stays clean. The agents handle the messy stuff.
 ```
 /OperationalMap
 ├── docs/
-│   └── index.html          ← GitHub Pages (live demo)
-├── demo-map.html            ← Map prototype source
+│   └── index.html          ← GitHub Pages (live graph demo)
+├── demo-graph.html          ← Graph prototype source (primary demo)
+├── demo-map.html            ← List-based map prototype
 ├── demo-dashboard.html      ← Full dashboard demo (vision reference)
 ├── demo.html                ← Original dashboard prototype
 ├── index.html               ← Placeholder for production app
