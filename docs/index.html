@@ -599,7 +599,8 @@ let gNodes = [];
 let gEdges = [];
 let gCam = {x:0,y:0,zoom:1,tX:0,tY:0,tZ:1};
 let gHover = null, gDrag = null, gPan = false, gPanStart = {x:0,y:0,cx:0,cy:0};
-let gSim = true, gAlpha = 1, gTime = 0, gAutoFitPending = false, gAutoFitFrame = 0;
+let gSim = true, gAlpha = 1, gTime = 0, gDidInitFit = false;
+let gUserZoomed = false; // once user zooms/pans, stop auto-fitting
 
 function gResize() {
   const rect = gCanvas.parentElement.getBoundingClientRect();
@@ -612,19 +613,23 @@ function gResize() {
 
 function gBuild() {
   // Place nodes in world space centered at 0,0 with wide initial spread
-  const spread = Math.max(gW, gH) * 0.8;
-  gNodes = NODES.map(n => ({...n, x: (Math.random()-0.5)*spread, y: (Math.random()-0.5)*spread*0.7,
-    vx:0, vy:0, radius: 4 + Math.min(n.connCount * 0.8, 4),
-    glow: n.type==='person'?'rgba(109,32,119,0.4)':n.type==='client'?'rgba(0,164,228,0.35)':n.type==='project'?'rgba(22,163,74,0.3)':n.type==='doc'?'rgba(217,119,6,0.3)':'rgba(107,114,128,0.2)',
-    opacity: n.daysStale != null ? (n.daysStale < 30 ? 1 : n.daysStale < 60 ? 0.55 : 0.3) : (n.status==='Historical'?0.35:0.9)
-  }));
+  const spread = Math.max(gW, gH) * 1.2;
+  gNodes = NODES.map(n => {
+    // Radius scales with connection count — hubs are larger
+    const r = 3 + Math.sqrt(n.connCount) * 2.5;
+    return {...n, x: (Math.random()-0.5)*spread, y: (Math.random()-0.5)*spread*0.7,
+      vx:0, vy:0, radius: r, baseRadius: r,
+      glow: n.type==='person'?'rgba(109,32,119,0.4)':n.type==='client'?'rgba(0,164,228,0.35)':n.type==='project'?'rgba(22,163,74,0.3)':n.type==='doc'?'rgba(217,119,6,0.3)':'rgba(107,114,128,0.2)',
+      opacity: n.daysStale != null ? (n.daysStale < 30 ? 1 : n.daysStale < 60 ? 0.55 : 0.3) : (n.status==='Historical'?0.35:0.9)
+    };
+  });
   const gNodeMap = {}; gNodes.forEach(n => gNodeMap[n.id] = n);
   gEdges = EDGES.map(e => ({...e, a: gNodeMap[e.from], b: gNodeMap[e.to]})).filter(e => e.a && e.b);
   // Place "you" at origin
   const youN = gNodes.find(n => n.you);
   if (youN) { youN.x = 0; youN.y = 0; }
   gCam.x = gCam.tX = 0; gCam.y = gCam.tY = 0;
-  gAutoFitPending = true;
+  gDidInitFit = false; gUserZoomed = false;
 }
 
 function gScreenToWorld(sx,sy) { return {x:(sx-gW/2)/gCam.zoom+gCam.x, y:(sy-gH/2)/gCam.zoom+gCam.y}; }
@@ -644,39 +649,110 @@ function gGetAlpha(node) {
 
 function gSimulate() {
   if (!gSim) return;
-  if (gAlpha < 0.001) { gSim = false; if(gAutoFitPending){gAutoFitPending=false;gRecenter();} return; }
-  gAlpha *= 0.995;
-  const a = gAlpha, N = gNodes.length;
-  // Gentle center gravity toward origin
-  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (0-n.x)*0.00004*a; n.vy += (0-n.y)*0.00004*a; });
-  // Node repulsion — inverse-square but with soft minimum and force cap
-  for (let i=0;i<N;i++) for (let j=i+1;j<N;j++) {
-    const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d2=dx*dx+dy*dy;
-    const d=Math.sqrt(d2)||1;
-    const safeDist=Math.max(d,80);
-    const f=Math.min(4000*a/(safeDist*safeDist), 1.5*a); // capped repulsion
-    const fx=(dx/d)*f,fy=(dy/d)*f;
-    if(A!==gDrag){A.vx+=fx;A.vy+=fy;} if(B!==gDrag){B.vx-=fx;B.vy-=fy;}
+  if (gAlpha < 0.002) {
+    gSim = false;
+    if(!gDidInitFit){gDidInitFit=true;gRecenter();}
+    return;
   }
-  // Edge springs — gentle pull, capped
-  gEdges.forEach(e => {
-    const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const ideal=e.a.type===e.b.type?180:260;
-    const rawF=(d-ideal)*0.0003*a;
-    const f=Math.sign(rawF)*Math.min(Math.abs(rawF),1.2*a);
-    const fx=(dx/d)*f,fy=(dy/d)*f;
-    if(e.a!==gDrag){e.a.vx+=fx;e.a.vy+=fy;} if(e.b!==gDrag){e.b.vx-=fx;e.b.vy-=fy;}
+  gAlpha *= 0.992;
+  const N = gNodes.length;
+
+  // 1. Reset forces
+  gNodes.forEach(n => { n.fx = 0; n.fy = 0; });
+
+  // 2. Very gentle center gravity (prevents drift, doesn't collapse)
+  gNodes.forEach(n => {
+    if (n===gDrag) return;
+    const dist = Math.sqrt(n.x*n.x + n.y*n.y) || 1;
+    n.fx -= n.x * 0.00003;
+    n.fy -= n.y * 0.00003;
   });
-  // Apply velocity with strong damping + speed cap
+
+  // 3. Node-node repulsion — Coulomb-like with soft minimum
+  // Uses k/d for distances < threshold (strong close), k/d² for far (quick falloff)
+  for (let i=0;i<N;i++) {
+    const A=gNodes[i];
+    for (let j=i+1;j<N;j++) {
+      const B=gNodes[j];
+      const dx=B.x-A.x, dy=B.y-A.y;
+      let d=Math.sqrt(dx*dx+dy*dy)||0.1;
+      const minDist = (A.radius + B.radius) * 4;
+      // Strong short-range, fading long-range
+      let force;
+      if (d < minDist) {
+        // Hard push at close range (prevents overlap)
+        force = 5 / Math.max(d/minDist, 0.1);
+      } else {
+        // Gentle long-range repulsion
+        force = 2000 / (d * d);
+      }
+      force = Math.min(force, 4); // absolute cap
+      const ux=dx/d, uy=dy/d;
+      if(A!==gDrag){A.fx-=ux*force;A.fy-=uy*force;}
+      if(B!==gDrag){B.fx+=ux*force;B.fy+=uy*force;}
+    }
+  }
+
+  // 4. Edge springs — Hooke's law, gently pulls connected nodes together
+  gEdges.forEach(e => {
+    const dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, d=Math.sqrt(dx*dx+dy*dy)||0.1;
+    const ideal = e.a.type===e.b.type ? 150 : 220;
+    const displacement = d - ideal;
+    // Spring stiffness — weaker when far (prevents violent snapping)
+    const stiffness = 0.003;
+    let force = displacement * stiffness;
+    force = Math.sign(force) * Math.min(Math.abs(force), 1.5); // cap
+    const ux=dx/d, uy=dy/d;
+    if(e.a!==gDrag){e.a.fx+=ux*force;e.a.fy+=uy*force;}
+    if(e.b!==gDrag){e.b.fx-=ux*force;e.b.fy-=uy*force;}
+  });
+
+  // 5. Hover expansion — push neighbors of hovered node outward
+  if (gHover && !gDrag) {
+    gEdges.forEach(e => {
+      let neighbor = null;
+      if (e.a === gHover) neighbor = e.b;
+      else if (e.b === gHover) neighbor = e.a;
+      if (!neighbor || neighbor === gDrag) return;
+      const dx=neighbor.x-gHover.x, dy=neighbor.y-gHover.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      if (d < 120) {
+        const push = (120-d)*0.05;
+        neighbor.fx += (dx/d)*push;
+        neighbor.fy += (dy/d)*push;
+      }
+    });
+  }
+
+  // 6. Apply forces with alpha scaling, damping, and speed limit
   gNodes.forEach(n => {
     if(n===gDrag){n.vx=0;n.vy=0;return;}
-    n.vx*=0.6; n.vy*=0.6;
-    const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
-    if(spd>8){const s=8/spd;n.vx*=s;n.vy*=s;}
-    n.x+=n.vx; n.y+=n.vy;
+    n.vx = (n.vx + n.fx * gAlpha) * 0.65;
+    n.vy = (n.vy + n.fy * gAlpha) * 0.65;
+    const spd = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
+    if(spd > 5){const s=5/spd; n.vx*=s; n.vy*=s;}
+    n.x += n.vx;
+    n.y += n.vy;
   });
-  // Auto-fit periodically during simulation warm-up
-  if(gAutoFitPending){gAutoFitFrame++;if(gAutoFitFrame%30===0)gRecenter();}
+
+  // 7. Collision resolution pass — hard overlap prevention
+  for (let iter=0;iter<2;iter++) {
+    for (let i=0;i<N;i++) {
+      const A=gNodes[i];
+      for (let j=i+1;j<N;j++) {
+        const B=gNodes[j];
+        const dx=B.x-A.x, dy=B.y-A.y;
+        const d=Math.sqrt(dx*dx+dy*dy)||0.1;
+        const minD = (A.radius+B.radius)*2.5;
+        if (d < minD) {
+          const overlap = (minD-d)/2;
+          const ux=dx/d, uy=dy/d;
+          if(A!==gDrag){A.x-=ux*overlap;A.y-=uy*overlap;}
+          if(B!==gDrag){B.x+=ux*overlap;B.y+=uy*overlap;}
+        }
+      }
+    }
+  }
 }
 
 function gDraw() {
@@ -748,31 +824,44 @@ function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1
 
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
-function graphRestart(){gSim=true;gAlpha=0.4;gAutoFitPending=true;gAutoFitFrame=0;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*3;n.vy+=(Math.random()-0.5)*3;});}
+function graphRestart(){gSim=true;gAlpha=0.3;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*2;n.vy+=(Math.random()-0.5)*2;});}
 
 function gRecenter(){
-  // Fit all visible nodes in view
   if(!gNodes.length)return;
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   gNodes.forEach(n=>{if(n.x<minX)minX=n.x;if(n.x>maxX)maxX=n.x;if(n.y<minY)minY=n.y;if(n.y>maxY)maxY=n.y;});
   const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
-  const dx=maxX-minX+200,dy=maxY-minY+200;
+  const dx=maxX-minX+300,dy=maxY-minY+300;
   const zx=gW/dx,zy=gH/dy;
-  gCam.tX=cx;gCam.tY=cy;gCam.tZ=Math.min(Math.max(Math.min(zx,zy),0.2),2);
+  gCam.tX=cx;gCam.tY=cy;gCam.tZ=Math.min(Math.max(Math.min(zx,zy),0.15),2);
+  gUserZoomed=false;
 }
-function gZoomIn(){gCam.tZ=Math.min(4,gCam.tZ*1.3);}
-function gZoomOut(){gCam.tZ=Math.max(0.15,gCam.tZ*0.7);}
+function gZoomIn(){gCam.tZ=Math.min(4,gCam.tZ*1.3);gUserZoomed=true;}
+function gZoomOut(){gCam.tZ=Math.max(0.15,gCam.tZ*0.7);gUserZoomed=true;}
 
 // Graph mouse events
 gCanvas.addEventListener('mousemove',e=>{const rect=gCanvas.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
-  if(gDrag){const w=gScreenToWorld(mx,my);gDrag.x=w.x;gDrag.y=w.y;gDrag.vx=0;gDrag.vy=0;gSim=true;gAlpha=Math.max(gAlpha,0.08);return;}
-  if(gPan){const dx=e.clientX-gPanStart.x,dy=e.clientY-gPanStart.y;gCam.tX=gPanStart.cx-dx/gCam.zoom;gCam.tY=gPanStart.cy-dy/gCam.zoom;return;}
+  if(gDrag){const w=gScreenToWorld(mx,my);gDrag.x=w.x;gDrag.y=w.y;gDrag.vx=0;gDrag.vy=0;gSim=true;gAlpha=Math.max(gAlpha,0.05);return;}
+  if(gPan){const dx=e.clientX-gPanStart.x,dy=e.clientY-gPanStart.y;gCam.tX=gPanStart.cx-dx/gCam.zoom;gCam.tY=gPanStart.cy-dy/gCam.zoom;gUserZoomed=true;return;}
   gHover=gHitTest(mx,my);gCanvas.className=gHover?'hovering':'';});
 gCanvas.addEventListener('mousedown',e=>{const rect=gCanvas.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
   const hit=gHitTest(mx,my);if(hit)gDrag=hit;else{gPan=true;gPanStart={x:e.clientX,y:e.clientY,cx:gCam.tX,cy:gCam.tY};}});
 gCanvas.addEventListener('mouseup',e=>{if(gDrag){const rect=gCanvas.getBoundingClientRect();const hit=gHitTest(e.clientX-rect.left,e.clientY-rect.top);if(hit===gDrag)openDetail(gDrag.id);gDrag=null;}gPan=false;});
-gCanvas.addEventListener('wheel',e=>{e.preventDefault();gCam.tZ=Math.max(0.15,Math.min(4,gCam.tZ*(e.deltaY>0?0.9:1.1)));},{passive:false});
-gCanvas.addEventListener('dblclick',e=>{const rect=gCanvas.getBoundingClientRect();const hit=gHitTest(e.clientX-rect.left,e.clientY-rect.top);if(hit){gCam.tX=hit.x;gCam.tY=hit.y;gCam.tZ=Math.max(gCam.tZ,1.5);openDetail(hit.id);}});
+gCanvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  // Zoom toward cursor position
+  const rect=gCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const worldBefore=gScreenToWorld(mx,my);
+  const factor=e.deltaY>0?0.88:1.12;
+  gCam.tZ=Math.max(0.08,Math.min(5,gCam.tZ*factor));
+  // Adjust pan so world point under cursor stays fixed
+  const newZoom=gCam.tZ;
+  gCam.tX=worldBefore.x-(mx-gW/2)/newZoom;
+  gCam.tY=worldBefore.y-(my-gH/2)/newZoom;
+  gUserZoomed=true;
+},{passive:false});
+gCanvas.addEventListener('dblclick',e=>{const rect=gCanvas.getBoundingClientRect();const hit=gHitTest(e.clientX-rect.left,e.clientY-rect.top);if(hit){gCam.tX=hit.x;gCam.tY=hit.y;gCam.tZ=Math.max(gCam.tZ,1.5);gUserZoomed=true;openDetail(hit.id);}});
 
 // ============================================================
 // DETAIL PANEL
