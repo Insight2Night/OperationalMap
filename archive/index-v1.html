@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operational Map</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--purple:#6D2077;--purple-light:#8a3a96;--purple-bg:rgba(109,32,119,0.08);
+--blue:#00A4E4;--blue-light:#33b5ea;
+--sidebar-bg:#1a1a2e;--sidebar-hover:#16213e;--sidebar-active:#0f3460;
+--bg:#f4f5f7;--card:#fff;--text:#1a1a2e;--text-muted:#6b7280;--text-light:#9ca3af;
+--border:#e5e7eb;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-md:0 4px 12px rgba(0,0,0,0.1);--shadow-lg:0 8px 24px rgba(0,0,0,0.12);
+--green:#16a34a;--green-bg:#dcfce7;--amber:#d97706;--amber-bg:#fef3c7;--red:#dc2626;--red-bg:#fee2e2;--gray:#6b7280;--gray-bg:#f3f4f6;
+--radius:8px;--radius-lg:12px;--transition:0.2s ease;
+}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;overflow-x:hidden}
+@font-face{font-family:'Inter';src:local('Inter');font-display:swap}
+
+/* SIDEBAR */
+.sidebar{position:fixed;top:0;left:0;width:250px;height:100vh;background:var(--sidebar-bg);display:flex;flex-direction:column;z-index:100;transition:var(--transition)}
+.sidebar-logo{padding:24px 20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:12px}
+.sidebar-logo .logo-icon{width:36px;height:36px;background:var(--purple);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff}
+.sidebar-logo .logo-text{color:#fff;font-size:16px;font-weight:700;letter-spacing:-0.3px}
+.sidebar-logo .logo-sub{color:var(--text-light);font-size:10px;text-transform:uppercase;letter-spacing:1.2px;margin-top:2px}
+.sidebar-nav{flex:1;padding:16px 0}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 20px;color:rgba(255,255,255,0.6);cursor:pointer;transition:var(--transition);font-size:14px;font-weight:500;border-left:3px solid transparent;position:relative}
+.nav-item:hover{color:rgba(255,255,255,0.9);background:var(--sidebar-hover)}
+.nav-item.active{color:#fff;background:var(--sidebar-hover);border-left-color:var(--purple)}
+.nav-item .nav-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+.nav-item.disabled{opacity:0.35;cursor:not-allowed}
+.nav-item.disabled:hover{background:transparent;color:rgba(255,255,255,0.6)}
+.nav-tooltip{display:none;position:absolute;left:100%;top:50%;transform:translateY(-50%);background:#333;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:200}
+.nav-item.disabled:hover .nav-tooltip{display:block}
+.sidebar-user{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:12px}
+.sidebar-user .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+.sidebar-user .user-info{color:#fff}
+.sidebar-user .user-name{font-size:13px;font-weight:600}
+.sidebar-user .user-role{font-size:11px;color:var(--text-light)}
+
+/* MAIN */
+.main{margin-left:250px;min-height:100vh}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.topbar-left h1{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted)}
+.breadcrumb a{color:var(--blue);text-decoration:none;cursor:pointer}
+.breadcrumb a:hover{text-decoration:underline}
+.breadcrumb span{color:var(--text-muted)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.search-box{position:relative}
+.search-box input{width:280px;padding:9px 14px 9px 38px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);transition:var(--transition);font-family:inherit}
+.search-box input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,32,119,0.1)}
+.search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:0.5}
+.btn{padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:var(--transition);font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--purple);color:#fff}
+.btn-primary:hover{background:var(--purple-light);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--purple);color:var(--purple)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-ghost{background:transparent;color:var(--text-muted);padding:6px 10px}
+.btn-ghost:hover{color:var(--purple);background:var(--purple-bg)}
+
+.content{padding:28px 32px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border-radius:var(--radius-lg);padding:20px 22px;border:1px solid var(--border);transition:var(--transition)}
+.stat-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.stat-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;margin-bottom:6px}
+.stat-value{font-size:30px;font-weight:800;letter-spacing:-1px}
+.stat-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:8px;vertical-align:middle}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-amber{background:var(--amber-bg);color:var(--amber)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-gray{background:var(--gray-bg);color:var(--gray)}
+
+/* FILTERS */
+.filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.filter-pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:7px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--text-muted);transition:var(--transition)}
+.pill:hover{border-color:var(--purple);color:var(--purple)}
+.pill.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+.sort-select{padding:7px 12px;border-radius:var(--radius);border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--card);color:var(--text);cursor:pointer}
+.sort-select:focus{outline:none;border-color:var(--purple)}
+
+/* CLIENT GRID */
+.client-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.client-card{background:var(--card);border-radius:var(--radius-lg);padding:22px;border:1px solid var(--border);cursor:pointer;transition:all 0.25s ease;position:relative;overflow:hidden}
+.client-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);border-color:rgba(109,32,119,0.2)}
+.client-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--purple);opacity:0;transition:var(--transition)}
+.client-card:hover::after{opacity:1}
+.client-card .cc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.client-card .cc-name{font-size:16px;font-weight:700;letter-spacing:-0.3px;color:var(--text)}
+.status-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.status-active{background:var(--green-bg);color:var(--green)}
+.status-onboarding{background:var(--amber-bg);color:var(--amber)}
+.status-winding{background:var(--gray-bg);color:var(--gray)}
+.status-stale{background:var(--red-bg);color:var(--red)}
+.client-card .cc-owner{font-size:13px;color:var(--text-muted);margin-bottom:4px}
+.client-card .cc-updated{font-size:12px;color:var(--text-light)}
+.client-card .cc-footer{display:flex;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.client-card .cc-footer span{font-size:12px;color:var(--text-light);display:flex;align-items:center;gap:4px}
+.no-results{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted)}
+.no-results .nr-icon{font-size:48px;margin-bottom:12px;opacity:0.4}
+.no-results p{font-size:14px}
+
+/* AI BANNER */
+.ai-banner{margin-top:32px;background:linear-gradient(135deg,rgba(109,32,119,0.12) 0%,rgba(0,164,228,0.08) 100%);border:1px solid rgba(109,32,119,0.15);border-radius:var(--radius-lg);padding:20px 28px;display:flex;align-items:center;gap:16px}
+.ai-banner .ai-icon{font-size:28px;flex-shrink:0}
+.ai-banner .ai-text{flex:1}
+.ai-banner .ai-title{font-size:14px;font-weight:700;color:var(--purple);margin-bottom:2px}
+.ai-banner .ai-desc{font-size:12px;color:var(--text-muted)}
+.ai-banner .ai-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ai-banner .ai-pill{padding:3px 10px;border-radius:12px;font-size:11px;background:rgba(109,32,119,0.08);color:var(--purple);font-weight:500}
+
+/* CLIENT DETAIL */
+.detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.detail-header .dh-left{display:flex;align-items:center;gap:14px}
+.detail-header .dh-left h2{font-size:26px;font-weight:800;letter-spacing:-0.5px}
+.detail-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
+.detail-tab{padding:12px 22px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:var(--transition)}
+.detail-tab:hover{color:var(--text)}
+.detail-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.overview-grid{display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px}
+.info-section{background:var(--card);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border)}
+.info-section h3{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-row .label{color:var(--text-muted);font-weight:500}
+.info-row .value{font-weight:600;text-align:right;max-width:60%}
+.quick-link{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius);background:var(--bg);margin-bottom:8px;cursor:pointer;transition:var(--transition);font-size:13px;color:var(--blue);font-weight:500}
+.quick-link:hover{background:rgba(0,164,228,0.08);transform:translateX(2px)}
+.notes-box{background:var(--bg);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--text-muted);line-height:1.7;margin-top:8px}
+.ai-assistant-box{background:var(--bg);border:1px dashed rgba(109,32,119,0.25);border-radius:var(--radius-lg);padding:24px;margin-top:20px;opacity:0.7}
+.ai-assistant-box h4{font-size:14px;font-weight:700;color:var(--purple);margin-bottom:12px}
+.ai-assistant-box ul{list-style:none;padding:0}
+.ai-assistant-box li{font-size:12px;color:var(--text-muted);padding:6px 0;padding-left:20px;position:relative}
+.ai-assistant-box li::before{content:'→';position:absolute;left:0;color:var(--purple);opacity:0.5}
+.ai-assistant-box .disabled-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;background:var(--gray-bg);color:var(--gray);font-weight:600;margin-left:8px;vertical-align:middle}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;padding:12px 16px;background:var(--bg);font-weight:600;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid var(--border)}
+.data-table td{padding:12px 16px;border-bottom:1px solid var(--border)}
+.data-table tr:hover td{background:rgba(109,32,119,0.02)}
+.data-table .primary-badge{background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.row-amber td{background:rgba(217,119,6,0.04)!important}
+.row-red td{background:rgba(220,38,38,0.04)!important}
+
+/* DOCS GRID */
+.docs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.doc-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:var(--transition);position:relative}
+.doc-card:hover{box-shadow:var(--shadow-md);border-color:rgba(0,164,228,0.3)}
+.doc-card .doc-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.doc-card .doc-type{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;margin-bottom:8px}
+.doc-type-sow{background:#ede9fe;color:#7c3aed}
+.doc-type-contract{background:#dbeafe;color:#2563eb}
+.doc-type-process{background:#d1fae5;color:#059669}
+.doc-type-reference{background:#fef3c7;color:#d97706}
+.doc-card .doc-meta{font-size:11px;color:var(--text-light)}
+.doc-tooltip{display:none;position:absolute;top:-36px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:10}
+.doc-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#333}
+.doc-card:hover .doc-tooltip{display:block}
+
+/* TIMELINE */
+.timeline{position:relative;padding-left:28px}
+.timeline::before{content:'';position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--border)}
+.timeline-item{position:relative;padding-bottom:20px}
+.timeline-item:last-child{padding-bottom:0}
+.timeline-item .tl-dot{position:absolute;left:-24px;top:4px;width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:var(--card)}
+.timeline-item .tl-dot.dot-purple{border-color:var(--purple);background:var(--purple-bg)}
+.timeline-item .tl-dot.dot-blue{border-color:var(--blue);background:rgba(0,164,228,0.1)}
+.timeline-item .tl-dot.dot-red{border-color:var(--red);background:var(--red-bg)}
+.timeline-item .tl-dot.dot-green{border-color:var(--green);background:var(--green-bg)}
+.timeline-item .tl-text{font-size:13px;font-weight:500}
+.timeline-item .tl-time{font-size:11px;color:var(--text-light);margin-top:2px}
+
+/* TEAM VIEW */
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.team-card{background:var(--card);border-radius:var(--radius-lg);padding:28px;border:1px solid var(--border);text-align:center;transition:var(--transition)}
+.team-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.team-avatar{width:64px;height:64px;border-radius:50%;background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;margin:0 auto 14px}
+.team-card h3{font-size:17px;font-weight:700;margin-bottom:4px}
+.team-card .team-role{font-size:12px;color:var(--text-muted);margin-bottom:12px}
+.team-card .team-stat{font-size:24px;font-weight:800;color:var(--purple)}
+.team-card .team-stat-label{font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:14px}
+.team-clients{text-align:left;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.team-clients a{display:block;padding:5px 0;font-size:13px;color:var(--blue);text-decoration:none;cursor:pointer;transition:var(--transition)}
+.team-clients a:hover{color:var(--purple);padding-left:4px}
+
+/* STALE REPORT */
+.stale-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.stale-header .stale-count{background:var(--red-bg);color:var(--red);padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:var(--radius-lg);width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:modalIn 0.25s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:17px;font-weight:700}
+.modal-close{width:32px;height:32px;border-radius:var(--radius);border:none;background:var(--bg);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:var(--transition);color:var(--text-muted)}
+.modal-close:hover{background:var(--red-bg);color:var(--red)}
+.modal-body{padding:24px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit;transition:var(--transition)}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,32,119,0.1)}
+.form-group textarea{resize:vertical;min-height:80px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* TOAST */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px;animation:toastIn 0.3s ease;min-width:280px}
+.toast.toast-out{animation:toastOut 0.3s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(20px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
+.toast .toast-icon{font-size:16px}
+
+/* PAGE SECTIONS */
+.page-section{display:none}
+.page-section.active{display:block}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#9ca3af}
+
+/* Responsive tweaks */
+@media(max-width:1200px){.client-grid{grid-template-columns:repeat(2,1fr)}.overview-grid{grid-template-columns:1fr}.team-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.sidebar{width:60px}.sidebar .logo-text,.sidebar .logo-sub,.sidebar .nav-label,.sidebar .user-info{display:none}.main{margin-left:60px}.stats-row{grid-template-columns:repeat(2,1fr)}.client-grid{grid-template-columns:1fr}.search-box input{width:180px}}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📍</div>
+    <div>
+      <div class="logo-text">Operational Map</div>
+      <div class="logo-sub">Knowledge Surface</div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <span class="nav-icon">🏠</span><span class="nav-label">Dashboard</span>
+    </div>
+    <div class="nav-item" data-page="team" onclick="navigateTo('team')">
+      <span class="nav-icon">👥</span><span class="nav-label">Team View</span>
+    </div>
+    <div class="nav-item" data-page="stale" onclick="navigateTo('stale')">
+      <span class="nav-icon">⚠️</span><span class="nav-label">Stale Report</span>
+    </div>
+    <div class="nav-item" data-page="documents" onclick="navigateTo('documents')">
+      <span class="nav-icon">📄</span><span class="nav-label">Documents</span>
+    </div>
+    <div class="nav-item disabled">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+      <span class="nav-tooltip">Coming Soon</span>
+    </div>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-avatar">NA</div>
+    <div class="user-info">
+      <div class="user-name">Neal Anderson</div>
+      <div class="user-role">Admin</div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div id="topbar-breadcrumb"></div>
+      <h1 id="topbar-title">Dashboard</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="search-box">
+        <input type="text" id="global-search" placeholder="Search clients, owners..." oninput="handleSearch(this.value)">
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Client</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD PAGE -->
+  <div class="content">
+    <div id="page-dashboard" class="page-section active">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Total Clients</div>
+          <div class="stat-value">12</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active</div>
+          <div class="stat-value">8 <span class="stat-badge badge-green">● Active</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Onboarding</div>
+          <div class="stat-value">3 <span class="stat-badge badge-amber">● Onboarding</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Needs Attention</div>
+          <div class="stat-value">4 <span class="stat-badge badge-red">● Stale</span></div>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-pills">
+          <div class="pill active" data-filter="all" onclick="setFilter('all',this)">All</div>
+          <div class="pill" data-filter="Active" onclick="setFilter('Active',this)">Active</div>
+          <div class="pill" data-filter="Onboarding" onclick="setFilter('Onboarding',this)">Onboarding</div>
+          <div class="pill" data-filter="Winding Down" onclick="setFilter('Winding Down',this)">Winding Down</div>
+          <div class="pill" data-filter="Stale" onclick="setFilter('Stale',this)">Stale (30+ days)</div>
+        </div>
+        <select class="sort-select" onchange="setSort(this.value)">
+          <option value="updated">Sort: Last Updated</option>
+          <option value="name">Sort: Name (A-Z)</option>
+          <option value="status">Sort: Status</option>
+        </select>
+      </div>
+
+      <div class="client-grid" id="client-grid"></div>
+
+      <div class="ai-banner">
+        <div class="ai-icon">🤖</div>
+        <div class="ai-text">
+          <div class="ai-title">AI Features Coming Soon</div>
+          <div class="ai-desc">Intelligent automation to keep your operational map current and actionable.</div>
+          <div class="ai-pills">
+            <span class="ai-pill">Thread Summarization</span>
+            <span class="ai-pill">Stale Detection</span>
+            <span class="ai-pill">Smart Updates</span>
+            <span class="ai-pill">Agent Integration</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT DETAIL PAGE -->
+    <div id="page-detail" class="page-section">
+      <div class="detail-header">
+        <div class="dh-left">
+          <h2 id="detail-client-name"></h2>
+          <span id="detail-status-pill" class="status-pill"></span>
+        </div>
+        <button class="btn btn-secondary" onclick="showToast('✏️','Edit mode coming soon')">✏️ Edit</button>
+      </div>
+      <div class="detail-tabs">
+        <div class="detail-tab active" data-tab="overview" onclick="switchTab('overview',this)">Overview</div>
+        <div class="detail-tab" data-tab="contacts" onclick="switchTab('contacts',this)">Contacts</div>
+        <div class="detail-tab" data-tab="documents" onclick="switchTab('documents',this)">Documents</div>
+        <div class="detail-tab" data-tab="activity" onclick="switchTab('activity',this)">Activity Log</div>
+      </div>
+
+      <!-- Overview Tab -->
+      <div id="tab-overview" class="tab-content active">
+        <div class="overview-grid">
+          <div>
+            <div class="info-section">
+              <h3>📋 Client Information</h3>
+              <div id="detail-info-rows"></div>
+              <div id="detail-notes" class="notes-box" style="margin-top:16px"></div>
+            </div>
+            <div class="ai-assistant-box">
+              <h4>🧠 AI Assistant <span class="disabled-tag">Coming Soon</span></h4>
+              <ul>
+                <li>Paste an email thread to auto-extract status updates</li>
+                <li>Ask: "What's the latest on this client?"</li>
+                <li>Auto-flag missing SOW information</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="info-section">
+              <h3>🔗 Quick Links</h3>
+              <div id="detail-quick-links"></div>
+            </div>
+            <div class="info-section" style="margin-top:16px">
+              <h3>📊 At a Glance</h3>
+              <div id="detail-glance"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contacts Tab -->
+      <div id="tab-contacts" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="font-size:15px;font-weight:700">Client Contacts</h3>
+          <button class="btn btn-secondary btn-sm" onclick="showToast('👤','Add Contact form coming soon')">+ Add Contact</button>
+        </div>
+        <table class="data-table" id="detail-contacts-table">
+          <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Primary?</th></tr></thead>
+          <tbody id="detail-contacts-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Documents Tab -->
+      <div id="tab-documents" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="font-size:15px;font-weight:700">Linked Documents</h3>
+          <button class="btn btn-secondary btn-sm" onclick="showToast('📎','Link Document form coming soon')">+ Link Document</button>
+        </div>
+        <div class="docs-grid" id="detail-docs-grid"></div>
+      </div>
+
+      <!-- Activity Tab -->
+      <div id="tab-activity" class="tab-content">
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">Activity Log</h3>
+        <div class="timeline" id="detail-timeline"></div>
+      </div>
+    </div>
+
+    <!-- TEAM VIEW PAGE -->
+    <div id="page-team" class="page-section">
+      <div class="team-grid" id="team-grid"></div>
+    </div>
+
+    <!-- STALE REPORT PAGE -->
+    <div id="page-stale" class="page-section">
+      <div class="stale-header">
+        <h3 style="font-size:15px;font-weight:700">Clients Needing Attention</h3>
+        <span class="stale-count" id="stale-count"></span>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Client Name</th><th>Owner</th><th>Last Updated</th><th>Days Stale</th><th>Action</th></tr></thead>
+        <tbody id="stale-body"></tbody>
+      </table>
+    </div>
+
+    <!-- DOCUMENTS PAGE -->
+    <div id="page-documents" class="page-section">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:16px">All Documents Across Clients</h3>
+      <div class="docs-grid" id="all-docs-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CLIENT MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Add New Client</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Client Name</label>
+        <input type="text" placeholder="e.g. Acme Corporation">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select>
+          <option>Active</option>
+          <option>Onboarding</option>
+          <option>Winding Down</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Primary Owner</label>
+        <select>
+          <option>Neal Anderson</option>
+          <option>Sarah Chen</option>
+          <option>Marcus Webb</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Sales Rep</label>
+        <input type="text" placeholder="e.g. Jordan Blake">
+      </div>
+      <div class="form-group">
+        <label>Contract Platform</label>
+        <input type="text" placeholder="e.g. ServiceNow, Salesforce">
+      </div>
+      <div class="form-group">
+        <label>Key Notes</label>
+        <textarea placeholder="Initial notes about this client..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal();showToast('✅','Client added successfully (demo)')">Add Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const clients = [
+  {id:1,name:"Acme Corporation",status:"Active",owner:"Neal Anderson",daysAgo:2,contacts:4,docs:3,backup:"Sarah Chen",salesRep:"Jordan Blake",warehouse:"Tom Nguyen",platform:"ServiceNow",notes:"Long-standing enterprise client. Renewed SOW in Q1 2026. Primary focus on cloud migration and managed services. Weekly sync calls every Tuesday at 2 PM ET."},
+  {id:2,name:"Meridian Health Systems",status:"Active",owner:"Neal Anderson",daysAgo:5,contacts:3,docs:2,backup:"Marcus Webb",salesRep:"Lisa Tran",warehouse:"Carlos Mendez",platform:"Salesforce",notes:"Healthcare vertical — strict compliance requirements (HIPAA). Expanding into Azure environment. Budget approved for FY26 infrastructure refresh."},
+  {id:3,name:"TechVault Industries",status:"Onboarding",owner:"Sarah Chen",daysAgo:1,contacts:3,docs:4,backup:"Neal Anderson",salesRep:"Jordan Blake",warehouse:"Priya Patel",platform:"ServiceNow",notes:"New client as of March 2026. Currently in discovery phase. High potential for managed services expansion. CTO is very hands-on."},
+  {id:4,name:"Pinnacle Financial Group",status:"Active",owner:"Marcus Webb",daysAgo:12,contacts:4,docs:2,backup:"Sarah Chen",salesRep:"Derek Owens",warehouse:"Tom Nguyen",platform:"Salesforce",notes:"Financial services client with strict SLA requirements. Quarterly business reviews scheduled. Looking at security assessment in Q3."},
+  {id:5,name:"Redwood Logistics",status:"Winding Down",owner:"Neal Anderson",daysAgo:45,contacts:2,docs:3,backup:"Marcus Webb",salesRep:"Lisa Tran",warehouse:"Carlos Mendez",platform:"ServiceNow",notes:"Contract ending June 2026. Transition plan in progress. Need to ensure all documentation is transferred. Final invoice pending."},
+  {id:6,name:"Atlas Manufacturing",status:"Active",owner:"Sarah Chen",daysAgo:3,contacts:3,docs:2,backup:"Neal Anderson",salesRep:"Derek Owens",warehouse:"Priya Patel",platform:"Salesforce",notes:"Manufacturing vertical — heavy on IoT and edge computing. Plant floor network refresh underway. Strong executive sponsorship."},
+  {id:7,name:"Beacon Energy Partners",status:"Onboarding",owner:"Marcus Webb",daysAgo:8,contacts:3,docs:3,backup:"Sarah Chen",salesRep:"Jordan Blake",warehouse:"Tom Nguyen",platform:"ServiceNow",notes:"Energy sector client. Onboarding started Feb 2026. Complex multi-site deployment. Environmental monitoring requirements."},
+  {id:8,name:"Crestline Retail Corp",status:"Active",owner:"Neal Anderson",daysAgo:1,contacts:4,docs:3,backup:"Sarah Chen",salesRep:"Lisa Tran",warehouse:"Carlos Mendez",platform:"Salesforce",notes:"Retail client with 200+ locations. POS infrastructure managed by us. Holiday season prep starts in Q3. Very responsive team."},
+  {id:9,name:"Ironbridge Solutions",status:"Active",owner:"Sarah Chen",daysAgo:38,contacts:3,docs:2,backup:"Marcus Webb",salesRep:"Derek Owens",warehouse:"Priya Patel",platform:"ServiceNow",notes:"Software company — primarily cloud-native. Needs attention — last update was over a month ago. Follow up on pending SOW amendment."},
+  {id:10,name:"Northstar Aerospace",status:"Onboarding",owner:"Marcus Webb",daysAgo:4,contacts:3,docs:4,backup:"Neal Anderson",salesRep:"Jordan Blake",warehouse:"Tom Nguyen",platform:"Salesforce",notes:"Aerospace & defense — ITAR compliance required. Onboarding progressing well. Security clearance documentation in progress."},
+  {id:11,name:"Silverline Media Group",status:"Winding Down",owner:"Neal Anderson",daysAgo:62,contacts:2,docs:2,backup:"Sarah Chen",salesRep:"Lisa Tran",warehouse:"Carlos Mendez",platform:"ServiceNow",notes:"Media client winding down. Contract expired — in month-to-month holdover. Need to finalize transition documentation ASAP."},
+  {id:12,name:"Vanguard Disposal Services",status:"Active",owner:"Marcus Webb",daysAgo:41,contacts:3,docs:2,backup:"Neal Anderson",salesRep:"Derek Owens",warehouse:"Priya Patel",platform:"Salesforce",notes:"Waste management vertical. Stale — needs immediate follow-up. Fleet management system integration was paused pending budget approval."}
+];
+
+const contactsData = {
+  1:[{name:"Rachel Torres",role:"IT Director",email:"r.torres@acme.com",phone:"(555) 234-5678",primary:true},{name:"Jim Kowalski",role:"Procurement Lead",email:"j.kowalski@acme.com",phone:"(555) 234-5679",primary:false},{name:"Dana Whitfield",role:"CTO",email:"d.whitfield@acme.com",phone:"(555) 234-5680",primary:false},{name:"Tom Nguyen",role:"Warehouse Contact",email:"t.nguyen@acme.com",phone:"(555) 234-5681",primary:false}],
+  2:[{name:"Dr. Anita Patel",role:"CIO",email:"a.patel@meridian.com",phone:"(555) 345-6789",primary:true},{name:"Kevin O'Brien",role:"IT Manager",email:"k.obrien@meridian.com",phone:"(555) 345-6790",primary:false},{name:"Sandra Lee",role:"Compliance Officer",email:"s.lee@meridian.com",phone:"(555) 345-6791",primary:false}],
+  3:[{name:"Victor Huang",role:"CTO",email:"v.huang@techvault.com",phone:"(555) 456-7890",primary:true},{name:"Emily Ross",role:"Project Manager",email:"e.ross@techvault.com",phone:"(555) 456-7891",primary:false},{name:"Jason Park",role:"DevOps Lead",email:"j.park@techvault.com",phone:"(555) 456-7892",primary:false}],
+  4:[{name:"Margaret Chen",role:"VP Technology",email:"m.chen@pinnacle.com",phone:"(555) 567-8901",primary:true},{name:"Robert Diaz",role:"Security Officer",email:"r.diaz@pinnacle.com",phone:"(555) 567-8902",primary:false},{name:"Laura Kim",role:"IT Manager",email:"l.kim@pinnacle.com",phone:"(555) 567-8903",primary:false},{name:"Steve Jacobs",role:"Procurement",email:"s.jacobs@pinnacle.com",phone:"(555) 567-8904",primary:false}],
+  5:[{name:"Bill Henderson",role:"Operations VP",email:"b.henderson@redwood.com",phone:"(555) 678-9012",primary:true},{name:"Nancy Flores",role:"IT Lead",email:"n.flores@redwood.com",phone:"(555) 678-9013",primary:false}],
+  6:[{name:"Greg Tanaka",role:"Plant IT Manager",email:"g.tanaka@atlas.com",phone:"(555) 789-0123",primary:true},{name:"Maria Santos",role:"Operations Director",email:"m.santos@atlas.com",phone:"(555) 789-0124",primary:false},{name:"Dave Wilson",role:"Network Engineer",email:"d.wilson@atlas.com",phone:"(555) 789-0125",primary:false}],
+  7:[{name:"Patricia Moore",role:"CIO",email:"p.moore@beacon.com",phone:"(555) 890-1234",primary:true},{name:"James Liu",role:"Infrastructure Lead",email:"j.liu@beacon.com",phone:"(555) 890-1235",primary:false},{name:"Karen Walsh",role:"Project Coordinator",email:"k.walsh@beacon.com",phone:"(555) 890-1236",primary:false}],
+  8:[{name:"Mike Brennan",role:"VP IT",email:"m.brennan@crestline.com",phone:"(555) 901-2345",primary:true},{name:"Ashley Nguyen",role:"Store Systems Manager",email:"a.nguyen@crestline.com",phone:"(555) 901-2346",primary:false},{name:"Chris Taylor",role:"Network Admin",email:"c.taylor@crestline.com",phone:"(555) 901-2347",primary:false},{name:"Jen Martinez",role:"Procurement",email:"j.martinez@crestline.com",phone:"(555) 901-2348",primary:false}],
+  9:[{name:"Alex Drummond",role:"Engineering VP",email:"a.drummond@ironbridge.com",phone:"(555) 012-3456",primary:true},{name:"Samantha Cole",role:"DevOps Manager",email:"s.cole@ironbridge.com",phone:"(555) 012-3457",primary:false},{name:"Ryan Peters",role:"Cloud Architect",email:"r.peters@ironbridge.com",phone:"(555) 012-3458",primary:false}],
+  10:[{name:"Col. David Nash",role:"Program Director",email:"d.nash@northstar.com",phone:"(555) 123-4567",primary:true},{name:"Linda Zhao",role:"IT Security Lead",email:"l.zhao@northstar.com",phone:"(555) 123-4568",primary:false},{name:"Brian Foster",role:"Systems Engineer",email:"b.foster@northstar.com",phone:"(555) 123-4569",primary:false}],
+  11:[{name:"Tina Morales",role:"IT Director",email:"t.morales@silverline.com",phone:"(555) 234-5670",primary:true},{name:"Paul Richter",role:"Finance Lead",email:"p.richter@silverline.com",phone:"(555) 234-5671",primary:false}],
+  12:[{name:"Howard Grant",role:"Operations Manager",email:"h.grant@vanguard.com",phone:"(555) 345-6780",primary:true},{name:"Diana Brooks",role:"Fleet IT Lead",email:"d.brooks@vanguard.com",phone:"(555) 345-6781",primary:false},{name:"Mark Sullivan",role:"Procurement",email:"m.sullivan@vanguard.com",phone:"(555) 345-6782",primary:false}]
+};
+
+const docsData = {
+  1:[{name:"Master SOW v3",type:"SOW",by:"Neal Anderson",date:"Apr 8, 2026"},{name:"Cloud Migration Plan",type:"Process Doc",by:"Sarah Chen",date:"Mar 22, 2026"},{name:"SLA Agreement 2026",type:"Contract",by:"Neal Anderson",date:"Jan 15, 2026"}],
+  2:[{name:"Healthcare SOW v2",type:"SOW",by:"Neal Anderson",date:"Mar 30, 2026"},{name:"HIPAA Compliance Checklist",type:"Reference",by:"Marcus Webb",date:"Feb 28, 2026"}],
+  3:[{name:"Onboarding SOW Draft",type:"SOW",by:"Sarah Chen",date:"Apr 10, 2026"},{name:"Discovery Questionnaire",type:"Process Doc",by:"Sarah Chen",date:"Apr 5, 2026"},{name:"Technical Requirements",type:"Reference",by:"Neal Anderson",date:"Mar 28, 2026"},{name:"NDA Executed",type:"Contract",by:"Jordan Blake",date:"Mar 15, 2026"}],
+  4:[{name:"Financial Services SOW",type:"SOW",by:"Marcus Webb",date:"Feb 10, 2026"},{name:"Security Assessment Scope",type:"Reference",by:"Derek Owens",date:"Mar 5, 2026"}],
+  5:[{name:"Transition Plan",type:"Process Doc",by:"Neal Anderson",date:"Feb 28, 2026"},{name:"Original SOW",type:"SOW",by:"Lisa Tran",date:"Jan 10, 2025"},{name:"Asset Inventory",type:"Reference",by:"Neal Anderson",date:"Feb 15, 2026"}],
+  6:[{name:"Manufacturing SOW",type:"SOW",by:"Sarah Chen",date:"Apr 1, 2026"},{name:"IoT Deployment Guide",type:"Process Doc",by:"Sarah Chen",date:"Mar 18, 2026"}],
+  7:[{name:"Energy SOW Draft",type:"SOW",by:"Marcus Webb",date:"Apr 6, 2026"},{name:"Site Survey Template",type:"Process Doc",by:"Marcus Webb",date:"Mar 25, 2026"},{name:"Environmental Compliance",type:"Reference",by:"Jordan Blake",date:"Mar 20, 2026"}],
+  8:[{name:"Retail Master SOW",type:"SOW",by:"Neal Anderson",date:"Apr 12, 2026"},{name:"POS Refresh Schedule",type:"Process Doc",by:"Neal Anderson",date:"Apr 5, 2026"},{name:"Store Location Matrix",type:"Reference",by:"Lisa Tran",date:"Mar 10, 2026"}],
+  9:[{name:"Cloud Services SOW",type:"SOW",by:"Sarah Chen",date:"Mar 1, 2026"},{name:"Architecture Diagram",type:"Reference",by:"Sarah Chen",date:"Feb 20, 2026"}],
+  10:[{name:"Aerospace SOW Draft",type:"SOW",by:"Marcus Webb",date:"Apr 9, 2026"},{name:"ITAR Compliance Guide",type:"Reference",by:"Marcus Webb",date:"Apr 2, 2026"},{name:"Deployment Timeline",type:"Process Doc",by:"Jordan Blake",date:"Mar 28, 2026"},{name:"Security Clearance Tracker",type:"Process Doc",by:"Neal Anderson",date:"Apr 4, 2026"}],
+  11:[{name:"Original Contract",type:"Contract",by:"Lisa Tran",date:"Jun 15, 2024"},{name:"Transition Checklist",type:"Process Doc",by:"Neal Anderson",date:"Feb 10, 2026"}],
+  12:[{name:"Fleet Management SOW",type:"SOW",by:"Marcus Webb",date:"Jan 20, 2026"},{name:"Integration Spec",type:"Reference",by:"Derek Owens",date:"Feb 5, 2026"}]
+};
+
+const activityData = {
+  1:[
+    {icon:"dot-purple",text:"Neal Anderson updated status to Active",date:"Apr 12, 2026"},
+    {icon:"dot-blue",text:"Sarah Chen added contact: Tom Nguyen (Warehouse Contact)",date:"Apr 10, 2026"},
+    {icon:"dot-green",text:"Neal Anderson linked document: Master SOW v3",date:"Apr 8, 2026"},
+    {icon:"dot-purple",text:"Neal Anderson updated key notes",date:"Mar 28, 2026"},
+    {icon:"dot-green",text:"Sarah Chen linked document: Cloud Migration Plan",date:"Mar 22, 2026"},
+    {icon:"dot-purple",text:"Marcus Webb created this client",date:"Feb 20, 2026"}
+  ]
+};
+
+// Generate generic activity for clients without specific data
+function getActivity(client) {
+  if (activityData[client.id]) return activityData[client.id];
+  const updateDate = new Date();
+  updateDate.setDate(updateDate.getDate() - client.daysAgo);
+  const fmt = d => d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  return [
+    {icon:"dot-purple",text:client.owner+" updated client information",date:fmt(updateDate)},
+    {icon:"dot-blue",text:client.owner+" added a new contact",date:fmt(new Date(updateDate.getTime()-3*86400000))},
+    {icon:"dot-green",text:client.owner+" linked a document",date:fmt(new Date(updateDate.getTime()-7*86400000))},
+    {icon:"dot-red",text:"System flagged: Client not updated in 30+ days",date:client.daysAgo>=30?fmt(new Date(updateDate.getTime()-14*86400000)):null},
+    {icon:"dot-purple",text:client.owner+" created this client",date:fmt(new Date(updateDate.getTime()-60*86400000))}
+  ].filter(a=>a.date!==null);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let currentFilter = 'all';
+let currentSort = 'updated';
+let currentSearch = '';
+let currentPage = 'dashboard';
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigateTo(page, skipPush) {
+  currentPage = page;
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item:not(.disabled)').forEach(n => n.classList.remove('active'));
+
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+
+  const navEl = document.querySelector('.nav-item[data-page="'+page+'"]');
+  if (navEl) navEl.classList.add('active');
+
+  const titles = {dashboard:'Dashboard',team:'Team View',stale:'Stale Report',documents:'Documents',detail:'Client Detail'};
+  document.getElementById('topbar-title').textContent = titles[page] || 'Dashboard';
+
+  if (page === 'dashboard') {
+    document.getElementById('topbar-breadcrumb').innerHTML = '';
+  } else if (page === 'detail') {
+    // breadcrumb set in openDetail
+  } else {
+    document.getElementById('topbar-breadcrumb').innerHTML = '';
+  }
+
+  if (page === 'stale') renderStale();
+  if (page === 'team') renderTeam();
+  if (page === 'documents') renderAllDocs();
+}
+
+// ============================================================
+// RENDER CLIENT GRID
+// ============================================================
+function isStale(c) { return c.daysAgo >= 30; }
+
+function getStatusClass(c) {
+  if (c.status === 'Active') return 'status-active';
+  if (c.status === 'Onboarding') return 'status-onboarding';
+  if (c.status === 'Winding Down') return 'status-winding';
+  return 'status-active';
+}
+
+function getDisplayStatus(c) {
+  if (isStale(c)) return 'Stale';
+  return c.status;
+}
+
+function getDisplayStatusClass(c) {
+  if (isStale(c)) return 'status-stale';
+  return getStatusClass(c);
+}
+
+function relativeTime(days) {
+  if (days === 0) return 'Updated today';
+  if (days === 1) return 'Updated 1 day ago';
+  return 'Updated ' + days + ' days ago';
+}
+
+function renderGrid() {
+  let filtered = [...clients];
+
+  // Filter
+  if (currentFilter === 'Stale') {
+    filtered = filtered.filter(c => isStale(c));
+  } else if (currentFilter !== 'all') {
+    filtered = filtered.filter(c => c.status === currentFilter && !isStale(c));
+  }
+
+  // Search
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    filtered = filtered.filter(c => c.name.toLowerCase().includes(q) || c.owner.toLowerCase().includes(q));
+  }
+
+  // Sort
+  if (currentSort === 'updated') {
+    filtered.sort((a,b) => a.daysAgo - b.daysAgo);
+  } else if (currentSort === 'name') {
+    filtered.sort((a,b) => a.name.localeCompare(b.name));
+  } else if (currentSort === 'status') {
+    const order = {'Active':0,'Onboarding':1,'Winding Down':2};
+    filtered.sort((a,b) => (order[a.status]||3) - (order[b.status]||3));
+  }
+
+  const grid = document.getElementById('client-grid');
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="no-results"><div class="nr-icon">🔍</div><p>No clients match your current filters.</p></div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(c => `
+    <div class="client-card" onclick="openDetail(${c.id})">
+      <div class="cc-header">
+        <div class="cc-name">${c.name}</div>
+        <span class="status-pill ${getDisplayStatusClass(c)}">${getDisplayStatus(c)}</span>
+      </div>
+      <div class="cc-owner">👤 ${c.owner}</div>
+      <div class="cc-updated">${relativeTime(c.daysAgo)}${isStale(c)?' ⚠️':''}</div>
+      <div class="cc-footer">
+        <span>👥 ${c.contacts} contacts</span>
+        <span>📄 ${c.docs} documents</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setFilter(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderGrid();
+}
+
+function setSort(val) {
+  currentSort = val;
+  renderGrid();
+}
+
+function handleSearch(val) {
+  currentSearch = val.trim();
+  if (currentPage === 'dashboard') renderGrid();
+}
+
+// ============================================================
+// CLIENT DETAIL
+// ============================================================
+function openDetail(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+
+  navigateTo('detail');
+
+  // Breadcrumb
+  document.getElementById('topbar-breadcrumb').innerHTML = `
+    <a onclick="navigateTo('dashboard')">Dashboard</a>
+    <span>›</span>
+    <span>${c.name}</span>
+  `;
+  document.getElementById('topbar-title').textContent = '';
+
+  document.getElementById('detail-client-name').textContent = c.name;
+  const pill = document.getElementById('detail-status-pill');
+  pill.textContent = getDisplayStatus(c);
+  pill.className = 'status-pill ' + getDisplayStatusClass(c);
+
+  // Overview info
+  const updateDate = new Date();
+  updateDate.setDate(updateDate.getDate() - c.daysAgo);
+  const fmtDate = updateDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  document.getElementById('detail-info-rows').innerHTML = `
+    <div class="info-row"><span class="label">Status</span><span class="value"><span class="status-pill ${getDisplayStatusClass(c)}">${getDisplayStatus(c)}</span></span></div>
+    <div class="info-row"><span class="label">Primary  Owner</span><span class="value">${c.owner}</span></div>
+    <div class="info-row"><span class="label">Backup Contact</span><span class="value">${c.backup}</span></div>
+    <div class="info-row"><span class="label">Sales Rep</span><span class="value">${c.salesRep}</span></div>
+    <div class="info-row"><span class="label">Warehouse Contact</span><span class="value">${c.warehouse}</span></div>
+    <div class="info-row"><span class="label">Contract Platform</span><span class="value">${c.platform}</span></div>
+  `;
+  document.getElementById('detail-notes').innerHTML = '<strong style="font-size:12px;color:var(--text);display:block;margin-bottom:6px">Key Notes</strong>' + c.notes;
+
+  // Quick links
+  const primaryContact = (contactsData[c.id]||[]).find(x=>x.primary);
+  document.getElementById('detail-quick-links').innerHTML = `
+    <div class="quick-link" onclick="showToast('📄','Would open SharePoint link to SOW document')">📄 View SOW Document</div>
+    <div class="quick-link" onclick="showToast('📧','Would open email client')">📧 ${primaryContact ? primaryContact.name + ' — ' + primaryContact.email : 'No primary contact'}</div>
+    <div class="quick-link" onclick="showToast('🔗','Would open ${c.platform}')">🔗 Open in ${c.platform}</div>
+  `;
+
+  document.getElementById('detail-glance').innerHTML = `
+    <div class="info-row"><span class="label">Contacts</span><span class="value">${(contactsData[c.id]||[]).length}</span></div>
+    <div class="info-row"><span class="label">Documents</span><span class="value">${(docsData[c.id]||[]).length}</span></div>
+    <div class="info-row"><span class="label">Days Since Update</span><span class="value">${c.daysAgo} day${c.daysAgo!==1?'s':''}</span></div>
+    <div style="font-size:11px;color:var(--text-light);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Last updated by ${c.owner} on ${fmtDate}</div>
+  `;
+
+  // Contacts tab
+  const contacts = contactsData[c.id] || [];
+  document.getElementById('detail-contacts-body').innerHTML = contacts.map(ct => `
+    <tr>
+      <td style="font-weight:600">${ct.name}</td>
+      <td>${ct.role}</td>
+      <td><a href="mailto:${ct.email}" style="color:var(--blue);text-decoration:none">${ct.email}</a></td>
+      <td>${ct.phone}</td>
+      <td>${ct.primary ? '<span class="primary-badge">✓ Primary</span>' : '—'}</td>
+    </tr>
+  `).join('');
+
+  // Documents tab
+  const docs = docsData[c.id] || [];
+  document.getElementById('detail-docs-grid').innerHTML = docs.map(d => {
+    let typeClass = 'doc-type-reference';
+    if (d.type === 'SOW') typeClass = 'doc-type-sow';
+    else if (d.type === 'Contract') typeClass = 'doc-type-contract';
+    else if (d.type === 'Process Doc') typeClass = 'doc-type-process';
+    return `
+      <div class="doc-card" onclick="showToast('📄','Would open SharePoint link for: ${d.name}')">
+        <div class="doc-tooltip">Would open SharePoint link</div>
+        <div class="doc-name">${d.name}</div>
+        <span class="doc-type ${typeClass}">${d.type}</span>
+        <div class="doc-meta">Uploaded by ${d.by} on ${d.date}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Activity tab
+  const activity = getActivity(c);
+  document.getElementById('detail-timeline').innerHTML = activity.map(a => `
+    <div class="timeline-item">
+      <div class="tl-dot ${a.icon}"></div>
+      <div class="tl-text">${a.text}</div>
+      <div class="tl-time">${a.date}</div>
+    </div>
+  `).join('');
+
+  // Reset to overview tab
+  switchTab('overview', document.querySelector('.detail-tab[data-tab="overview"]'));
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab, el) {
+  document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+}
+
+// ============================================================
+// TEAM VIEW
+// ============================================================
+function renderTeam() {
+  const members = [
+    {name:"Neal Anderson",initials:"NA",role:"Project Coordinator Sr"},
+    {name:"Sarah Chen",initials:"SC",role:"Project Coordinator"},
+    {name:"Marcus Webb",initials:"MW",role:"Project Coordinator"}
+  ];
+
+  document.getElementById('team-grid').innerHTML = members.map(m => {
+    const owned = clients.filter(c => c.owner === m.name);
+    return `
+      <div class="team-card">
+        <div class="team-avatar">${m.initials}</div>
+        <h3>${m.name}</h3>
+        <div class="team-role">${m.role}</div>
+        <div class="team-stat">${owned.length}</div>
+        <div class="team-stat-label">Clients Owned</div>
+        <div class="team-clients">
+          ${owned.map(c => `<a onclick="openDetail(${c.id})">${c.name} <span class="status-pill ${getDisplayStatusClass(c)}" style="font-size:10px;padding:1px 6px;vertical-align:middle">${getDisplayStatus(c)}</span></a>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// STALE REPORT
+// ============================================================
+function renderStale() {
+  const stale = clients.filter(c => c.daysAgo >= 30).sort((a,b) => b.daysAgo - a.daysAgo);
+  document.getElementById('stale-count').textContent = stale.length + ' client' + (stale.length !== 1 ? 's' : '') + ' need attention';
+
+  document.getElementById('stale-body').innerHTML = stale.map(c => {
+    const rowClass = c.daysAgo >= 60 ? 'row-red' : 'row-amber';
+    return `
+      <tr class="${rowClass}">
+        <td><a style="color:var(--blue);cursor:pointer;text-decoration:none;font-weight:600" onclick="openDetail(${c.id})">${c.name}</a></td>
+        <td>${c.owner}</td>
+        <td>${relativeTime(c.daysAgo)}</td>
+        <td><span class="stat-badge ${c.daysAgo >= 60 ? 'badge-red' : 'badge-amber'}">${c.daysAgo} days</span></td>
+        <td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();this.textContent='✓ Reviewed';this.disabled=true;this.style.opacity='0.5';showToast('✅','Marked as reviewed: ${c.name}')">Mark Reviewed</button></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// ALL DOCUMENTS PAGE
+// ============================================================
+function renderAllDocs() {
+  let allDocs = [];
+  clients.forEach(c => {
+    (docsData[c.id]||[]).forEach(d => {
+      allDocs.push({...d, client: c.name, clientId: c.id});
+    });
+  });
+
+  const grid = document.getElementById('all-docs-grid');
+  grid.innerHTML = allDocs.map(d => {
+    let typeClass = 'doc-type-reference';
+    if (d.type === 'SOW') typeClass = 'doc-type-sow';
+    else if (d.type === 'Contract') typeClass = 'doc-type-contract';
+    else if (d.type === 'Process Doc') typeClass = 'doc-type-process';
+    return `
+      <div class="doc-card" onclick="showToast('📄','Would open SharePoint link for: ${d.name}')">
+        <div class="doc-tooltip">Would open SharePoint link</div>
+        <div class="doc-name">${d.name}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="doc-type ${typeClass}">${d.type}</span>
+          <span style="font-size:11px;color:var(--text-muted);cursor:pointer" onclick="event.stopPropagation();openDetail(${d.clientId})">📁 ${d.client}</span>
+        </div>
+        <div class="doc-meta">Uploaded by ${d.by} on ${d.date}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal() {
+  document.getElementById('modal-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget && e.target !== document.querySelector('.modal-close')) return;
+  document.getElementById('modal-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(icon, message) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<span class="toast-icon">${icon}</span>${message}`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    setTimeout(() => toast.remove(), 300);
+  }, 2800);
+}
+
+// ============================================================
+// KEYBOARD SHORTCUT
+// ============================================================
+document.addEventListener('keydown', function(e) {
+  // Escape closes modal
+  if (e.key === 'Escape') {
+    closeModal({target: document.getElementById('modal-overlay'), currentTarget: document.getElementById('modal-overlay')});
+  }
+  // Ctrl/Cmd + K focuses search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('global-search').focus();
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+renderGrid();
+</script>
+</body>
+</html>
+
