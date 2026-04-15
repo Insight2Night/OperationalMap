@@ -72,6 +72,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 #graph-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:grab}
 #graph-canvas:active{cursor:grabbing}
 #graph-canvas.hovering{cursor:pointer}
+.graph-controls{position:absolute;bottom:16px;right:16px;display:flex;gap:6px;z-index:10}
+.graph-ctrl-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--card-border);background:rgba(28,35,51,0.85);backdrop-filter:blur(8px);color:var(--text-muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.graph-ctrl-btn:hover{border-color:var(--purple);color:var(--purple-light);background:rgba(28,35,51,0.95)}
 
 /* LIST VIEWS (Table, Cards, Tree) */
 .list-view{position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;padding:20px 24px;display:none}
@@ -206,6 +209,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <!-- MAIN -->
 <div class="main" id="main-area">
   <canvas id="graph-canvas"></canvas>
+  <div class="graph-controls" id="graph-controls">
+    <button class="graph-ctrl-btn" onclick="gRecenter()" title="Recenter">⊕</button>
+    <button class="graph-ctrl-btn" onclick="gZoomIn()" title="Zoom In">+</button>
+    <button class="graph-ctrl-btn" onclick="gZoomOut()" title="Zoom Out">−</button>
+  </div>
   <div class="list-view" id="view-cards"></div>
   <div class="list-view" id="view-table"></div>
   <div class="list-view" id="view-tree"></div>
@@ -520,7 +528,7 @@ const gCtx = gCanvas.getContext('2d');
 let gW, gH, gDpr;
 let gNodes = [];
 let gEdges = [];
-let gCam = {x:0,y:0,zoom:0.85,tX:0,tY:0,tZ:0.85};
+let gCam = {x:0,y:0,zoom:1,tX:0,tY:0,tZ:1};
 let gHover = null, gDrag = null, gPan = false, gPanStart = {x:0,y:0,cx:0,cy:0};
 let gSim = true, gAlpha = 1, gTime = 0;
 
@@ -534,9 +542,9 @@ function gResize() {
 }
 
 function gBuild() {
-  gNodes = NODES.map(n => ({...n, x: gW/2 + (Math.random()-0.5)*400, y: gH/2 + (Math.random()-0.5)*300,
-    vx:0, vy:0, radius: 10 + Math.min(n.connCount * 2.5, 20),
-    glow: n.type==='person'?'rgba(109,32,119,0.3)':n.type==='client'?'rgba(0,164,228,0.25)':n.type==='project'?'rgba(22,163,74,0.2)':n.type==='doc'?'rgba(217,119,6,0.2)':'rgba(107,114,128,0.15)',
+  gNodes = NODES.map(n => ({...n, x: gW/2 + (Math.random()-0.5)*600, y: gH/2 + (Math.random()-0.5)*400,
+    vx:0, vy:0, radius: 4 + Math.min(n.connCount * 0.8, 4),
+    glow: n.type==='person'?'rgba(109,32,119,0.4)':n.type==='client'?'rgba(0,164,228,0.35)':n.type==='project'?'rgba(22,163,74,0.3)':n.type==='doc'?'rgba(217,119,6,0.3)':'rgba(107,114,128,0.2)',
     opacity: n.daysStale != null ? (n.daysStale < 30 ? 1 : n.daysStale < 60 ? 0.55 : 0.3) : (n.status==='Historical'?0.35:0.9)
   }));
   const gNodeMap = {}; gNodes.forEach(n => gNodeMap[n.id] = n);
@@ -564,93 +572,110 @@ function gGetAlpha(node) {
 function gSimulate() {
   if (!gSim) return;
   if (gAlpha < 0.001) { gSim = false; return; }
-  gAlpha *= 0.997;
+  gAlpha *= 0.995;
   const a = gAlpha, N = gNodes.length, cx = gW/2, cy = gH/2;
-  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (cx-n.x)*0.0003*a; n.vy += (cy-n.y)*0.0003*a; });
+  // Gentle center gravity
+  gNodes.forEach(n => { if (n===gDrag) return; n.vx += (cx-n.x)*0.00015*a; n.vy += (cy-n.y)*0.00015*a; });
+  // Node repulsion — strong enough for spacing with small nodes
   for (let i=0;i<N;i++) for (let j=i+1;j<N;j++) {
     const A=gNodes[i],B=gNodes[j]; let dx=B.x-A.x,dy=B.y-A.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const min=(A.radius+B.radius)*2.5; if(d<min)d=min;
-    const f=-600*a/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;
+    const min=60; if(d<min)d=min;
+    const f=-3000*a/(d*d),fx=(dx/d)*f,fy=(dy/d)*f;
     if(A!==gDrag){A.vx-=fx;A.vy-=fy;} if(B!==gDrag){B.vx+=fx;B.vy+=fy;}
   }
+  // Connected nodes pull together with type-aware clustering
   gEdges.forEach(e => {
     const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-    const ideal=e.a.type===e.b.type?100:120;
-    const f=(d-ideal)*0.0012*a,fx=(dx/d)*f,fy=(dy/d)*f;
+    const ideal=e.a.type===e.b.type?140:200;
+    const f=(d-ideal)*0.0008*a,fx=(dx/d)*f,fy=(dy/d)*f;
     if(e.a!==gDrag){e.a.vx+=fx;e.a.vy+=fy;} if(e.b!==gDrag){e.b.vx-=fx;e.b.vy-=fy;}
   });
-  gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.85;n.vy*=0.85;n.x+=n.vx;n.y+=n.vy; });
+  gNodes.forEach(n => { if(n===gDrag){n.vx=0;n.vy=0;return;} n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy; });
 }
 
 function gDraw() {
   gTime += 0.016;
   gCtx.clearRect(0,0,gW,gH);
-  // Grid
-  const gs=40*gCam.zoom;
-  if(gs>10){gCtx.fillStyle='rgba(45,53,72,0.2)';const ox=(gW/2-gCam.x*gCam.zoom)%gs,oy=(gH/2-gCam.y*gCam.zoom)%gs;for(let x=ox;x<gW;x+=gs)for(let y=oy;y<gH;y+=gs){gCtx.beginPath();gCtx.arc(x,y,0.6,0,Math.PI*2);gCtx.fill();}}
-  // Edges
+  // Subtle grid dots
+  const gs=50*gCam.zoom;
+  if(gs>8){gCtx.fillStyle='rgba(45,53,72,0.12)';const ox=(gW/2-gCam.x*gCam.zoom)%gs,oy=(gH/2-gCam.y*gCam.zoom)%gs;for(let x=ox;x<gW;x+=gs)for(let y=oy;y<gH;y+=gs){gCtx.beginPath();gCtx.arc(x,y,0.5,0,Math.PI*2);gCtx.fill();}}
+  // Edges — thin lines like Obsidian
   gEdges.forEach(e => {
     const sa=gWorldToScreen(e.a.x,e.a.y),sb=gWorldToScreen(e.b.x,e.b.y);
-    const aA=gGetAlpha(e.a),aB=gGetAlpha(e.b),ea=Math.min(aA,aB)*0.35;
+    const aA=gGetAlpha(e.a),aB=gGetAlpha(e.b),ea=Math.min(aA,aB);
     if(ea<0.01)return;
+    const isHovered=gHover&&(e.a===gHover||e.b===gHover);
     gCtx.beginPath();gCtx.moveTo(sa.x,sa.y);gCtx.lineTo(sb.x,sb.y);
-    gCtx.strokeStyle=e.primary?`rgba(109,32,119,${ea*2.5})`:`rgba(139,148,158,${ea})`;
-    gCtx.lineWidth=e.primary?2:1;gCtx.stroke();
+    if(isHovered){gCtx.strokeStyle=e.primary?`rgba(109,32,119,${ea*0.8})`:`rgba(139,148,158,${ea*0.6})`;gCtx.lineWidth=1.5;}
+    else{gCtx.strokeStyle=e.primary?`rgba(109,32,119,${ea*0.25})`:`rgba(139,148,158,${ea*0.12})`;gCtx.lineWidth=0.8;}
+    gCtx.stroke();
   });
-  // Nodes
+  // Nodes — all circles, Obsidian style
   gNodes.forEach(n => {
     const s=gWorldToScreen(n.x,n.y),r=n.radius*gCam.zoom,alpha=gGetAlpha(n);
-    if(alpha<0.01||r<1)return;
-    const pulse=n.daysStale>=30?1+Math.sin(gTime*2)*0.03:1;
-    // Glow
-    if((n===gHover||n.you)&&alpha>0.2){const gr=r*2.5;const g=gCtx.createRadialGradient(s.x,s.y,r*0.3,s.x,s.y,gr);g.addColorStop(0,n.glow);g.addColorStop(1,'transparent');gCtx.fillStyle=g;gCtx.globalAlpha=alpha*(n===gHover?0.8:0.35);gCtx.beginPath();gCtx.arc(s.x,s.y,gr,0,Math.PI*2);gCtx.fill();gCtx.globalAlpha=1;}
+    if(alpha<0.01||r<0.5)return;
+    const isHovered=n===gHover;
+    const isConnectedToHover=gHover&&gEdges.some(e=>(e.a===gHover&&e.b===n)||(e.b===gHover&&e.a===n));
+    // Subtle glow on hover
+    if(isHovered&&alpha>0.2){const gr=r*4;const g=gCtx.createRadialGradient(s.x,s.y,r,s.x,s.y,gr);g.addColorStop(0,n.glow);g.addColorStop(1,'transparent');gCtx.fillStyle=g;gCtx.globalAlpha=alpha*0.5;gCtx.beginPath();gCtx.arc(s.x,s.y,gr,0,Math.PI*2);gCtx.fill();gCtx.globalAlpha=1;}
+    // Draw circle for ALL node types
     gCtx.globalAlpha=alpha;
-    const dr=r*pulse;
-    if(n.type==='client'||n.type==='doc'){
-      const w=dr*2.2,h=dr*1.5,rx=s.x-w/2,ry=s.y-h/2,cr=6*gCam.zoom;
-      gCtx.beginPath();gCtx.moveTo(rx+cr,ry);gCtx.lineTo(rx+w-cr,ry);gCtx.quadraticCurveTo(rx+w,ry,rx+w,ry+cr);
-      gCtx.lineTo(rx+w,ry+h-cr);gCtx.quadraticCurveTo(rx+w,ry+h,rx+w-cr,ry+h);gCtx.lineTo(rx+cr,ry+h);
-      gCtx.quadraticCurveTo(rx,ry+h,rx,ry+h-cr);gCtx.lineTo(rx,ry+cr);gCtx.quadraticCurveTo(rx,ry,rx+cr,ry);
-      gCtx.closePath();gCtx.fillStyle=n.color;gCtx.fill();
-    } else if(n.type==='project'){
-      // Diamond
-      gCtx.beginPath();gCtx.moveTo(s.x,s.y-dr);gCtx.lineTo(s.x+dr,s.y);gCtx.lineTo(s.x,s.y+dr);gCtx.lineTo(s.x-dr,s.y);gCtx.closePath();gCtx.fillStyle=n.color;gCtx.fill();
-    } else {
-      gCtx.beginPath();gCtx.arc(s.x,s.y,dr,0,Math.PI*2);gCtx.fillStyle=n.color;gCtx.fill();
+    const dr=isHovered?r*1.3:r;
+    gCtx.beginPath();gCtx.arc(s.x,s.y,dr,0,Math.PI*2);gCtx.fillStyle=n.color;gCtx.fill();
+    if(n.you){gCtx.strokeStyle='#fff';gCtx.lineWidth=1.5;gCtx.stroke();}
+    else if(isHovered){gCtx.strokeStyle='rgba(255,255,255,0.5)';gCtx.lineWidth=1;gCtx.stroke();}
+    // External label — below node
+    const showLabel=isHovered||isConnectedToHover||n.you||r>3;
+    if(showLabel){
+      const fs=Math.max(8,Math.min(11,9*gCam.zoom));
+      const labelAlpha=isHovered||n.you?1:isConnectedToHover?0.7:Math.min(alpha,0.5+gCam.zoom*0.3);
+      gCtx.globalAlpha=labelAlpha;
+      gCtx.font=`${isHovered||n.you?600:500} ${fs}px Inter,sans-serif`;
+      gCtx.textAlign='center';gCtx.textBaseline='top';
+      // Text shadow for readability
+      gCtx.fillStyle='rgba(13,17,23,0.7)';
+      gCtx.fillText(n.name,s.x+1,s.y+dr+5);
+      gCtx.fillStyle=isHovered?'#fff':n.you?'#e6edf3':'#8b949e';
+      gCtx.fillText(n.name,s.x,s.y+dr+4);
     }
-    if(n.you){gCtx.strokeStyle='#fff';gCtx.lineWidth=2.5*gCam.zoom;gCtx.stroke();}
-    // Label
-    if(r>7){const fs=Math.max(7,Math.min(12,r*0.5));gCtx.font=`700 ${fs}px Inter,sans-serif`;gCtx.textAlign='center';gCtx.textBaseline='middle';gCtx.fillStyle='#fff';
-      let lbl=n.initials||n.name.split(' ').map(w=>w[0]).join('').slice(0,2);
-      if(n.type==='client'){lbl=n.name;const mw=dr*2;while(lbl.length>3&&gCtx.measureText(lbl+'…').width>mw)lbl=lbl.slice(0,-1);if(lbl!==n.name)lbl+='…';}
-      else if(n.type==='doc'){lbl=n.name.split(' ')[0];const mw=dr*2;if(gCtx.measureText(lbl).width>mw){lbl=lbl.slice(0,4)+'…';}}
-      gCtx.fillText(lbl,s.x,s.y);
-      if(r>13&&n.type==='person'){gCtx.font=`500 ${Math.max(7,fs*0.75)}px Inter,sans-serif`;gCtx.fillStyle=`rgba(230,237,243,${alpha*0.6})`;gCtx.fillText(n.name,s.x,s.y+dr+fs*0.7);}
-    }
-    // Status dot
-    if(n.type==='client'&&r>8){const ir=3.5*gCam.zoom;gCtx.beginPath();gCtx.arc(s.x+dr*1.1,s.y-dr*0.7,ir,0,Math.PI*2);
-      gCtx.fillStyle=n.daysStale>=60?'#dc2626':n.daysStale>=30?'#d97706':n.status==='Onboarding'?'#d97706':'#16a34a';gCtx.fill();}
+    // Status indicator for clients
+    if(n.type==='client'&&n.daysStale!=null&&r>2){const ir=2*gCam.zoom;gCtx.globalAlpha=alpha;gCtx.beginPath();gCtx.arc(s.x+dr+2,s.y-dr/2,ir,0,Math.PI*2);
+      gCtx.fillStyle=n.daysStale>=60?'#dc2626':n.daysStale>=30?'#d97706':'#16a34a';gCtx.fill();}
     gCtx.globalAlpha=1;
   });
-  // Tooltip
+  // Tooltip on hover
   if(gHover&&!gDrag){
     const s=gWorldToScreen(gHover.x,gHover.y);
     gCtx.font='600 11px Inter,sans-serif';
-    const tw=Math.max(gCtx.measureText(gHover.name).width,gCtx.measureText(gHover.sub||'').width)+20;
-    const th=38,tx=s.x-tw/2,ty=s.y-gHover.radius*gCam.zoom-th-10;
-    gCtx.fillStyle='rgba(28,35,51,0.95)';gRoundRect(tx,ty,tw,th,7);gCtx.fill();
-    gCtx.strokeStyle='rgba(45,53,72,0.7)';gCtx.lineWidth=1;gRoundRect(tx,ty,tw,th,7);gCtx.stroke();
-    gCtx.textAlign='center';gCtx.font='600 11px Inter,sans-serif';gCtx.fillStyle='#e6edf3';gCtx.fillText(gHover.name,s.x,ty+14);
-    gCtx.font='400 9px Inter,sans-serif';gCtx.fillStyle='#8b949e';gCtx.fillText(gHover.sub||'',s.x,ty+28);
+    const line1=gHover.name, line2=gHover.sub||'';
+    const tw=Math.max(gCtx.measureText(line1).width,gCtx.measureText(line2).width)+24;
+    const th=line2?40:24,tx=s.x-tw/2,ty=s.y-gHover.radius*gCam.zoom-th-16;
+    gCtx.fillStyle='rgba(28,35,51,0.92)';gRoundRect(tx,ty,tw,th,6);gCtx.fill();
+    gCtx.strokeStyle='rgba(109,32,119,0.3)';gCtx.lineWidth=1;gRoundRect(tx,ty,tw,th,6);gCtx.stroke();
+    gCtx.textAlign='center';gCtx.font='600 11px Inter,sans-serif';gCtx.fillStyle='#e6edf3';gCtx.fillText(line1,s.x,ty+13);
+    if(line2){gCtx.font='400 9px Inter,sans-serif';gCtx.fillStyle='#8b949e';gCtx.fillText(line2,s.x,ty+27);}
   }
 }
 function gRoundRect(x,y,w,h,r){gCtx.beginPath();gCtx.moveTo(x+r,y);gCtx.lineTo(x+w-r,y);gCtx.quadraticCurveTo(x+w,y,x+w,y+r);gCtx.lineTo(x+w,y+h-r);gCtx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);gCtx.lineTo(x+r,y+h);gCtx.quadraticCurveTo(x,y+h,x,y+h-r);gCtx.lineTo(x,y+r);gCtx.quadraticCurveTo(x,y,x+r,y);gCtx.closePath();}
 
-function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1;i>=0;i--){const n=gNodes[i],dx=w.x-n.x,dy=w.y-n.y;if(dx*dx+dy*dy<=n.radius*n.radius*1.7)return n;}return null;}
+function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1;i>=0;i--){const n=gNodes[i],dx=w.x-n.x,dy=w.y-n.y;const hitR=Math.max(n.radius,12);if(dx*dx+dy*dy<=hitR*hitR)return n;}return null;}
 
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
 function graphRestart(){gSim=true;gAlpha=0.4;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*3;n.vy+=(Math.random()-0.5)*3;});}
+
+function gRecenter(){
+  // Fit all visible nodes in view
+  if(!gNodes.length)return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  gNodes.forEach(n=>{if(n.x<minX)minX=n.x;if(n.x>maxX)maxX=n.x;if(n.y<minY)minY=n.y;if(n.y>maxY)maxY=n.y;});
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+  const dx=maxX-minX+200,dy=maxY-minY+200;
+  const zx=gW/dx,zy=gH/dy;
+  gCam.tX=cx;gCam.tY=cy;gCam.tZ=Math.min(Math.max(Math.min(zx,zy),0.2),2);
+}
+function gZoomIn(){gCam.tZ=Math.min(4,gCam.tZ*1.3);}
+function gZoomOut(){gCam.tZ=Math.max(0.15,gCam.tZ*0.7);}
 
 // Graph mouse events
 gCanvas.addEventListener('mousemove',e=>{const rect=gCanvas.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
