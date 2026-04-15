@@ -1,6 +1,8 @@
 # Operational Map
 
-A living org map — browse by people or by client, see every connection, verify ownership, trace every change. Not an agent. The connective tissue underneath all agents.
+The living map of everything Insight — people, clients, teams, projects, knowledge — searchable, verifiable, permission-based, and always current. Not an agent. The connective tissue underneath all agents.
+
+**Stop hunting. Start knowing.**
 
 [![Live Demo](https://img.shields.io/badge/demo-Live%20Prototype-6D2077)](https://insight2night.github.io/OperationalMap/)
 
@@ -10,27 +12,39 @@ A living org map — browse by people or by client, see every connection, verify
 
 **[https://insight2night.github.io/OperationalMap/](https://insight2night.github.io/OperationalMap/)**
 
-Open in any browser. No install, no dependencies. Click through everything — toggle views, expand nodes, drill into assignments, verify connections.
+Open in any browser. No install, no dependencies. Switch between four views, filter by category, drill into any node, verify connections.
 
-To run locally: open `demo-graph.html` in a browser.
+To run locally: open `demo-v4.html` in a browser.
 
 ---
 
 ## What This Is
 
-An Obsidian-style interactive graph of people, clients, and connections — alive, accountable, and AI-readable.
+A universal knowledge surface for everyone at Insight — not just operations.
 
-- **Graph View** — force-directed constellation of nodes. People, clients, external contacts, and DG groups as interconnected nodes. Drag, zoom, explore. Stale nodes fade. Verified nodes glow.
-- **Tree View** — clean structured layout of the same data for focused lookup
-- **Click any node** — detail panel with every connection, verification status, audit trail
-- **Search** — type a name, the graph flies to that node
-- **Verify / Edit** — anyone can suggest changes, approvers verify, everything traceable
+### Universal Node Types
+- **People** — any employee, any department
+- **Clients** — active, onboarding, historical
+- **Teams & Groups** — org units, distribution groups
+- **Projects** — active engagements tied to clients and people
+- **Documents** — SOWs, contracts, process docs, references
+
+### Four Views, Same Data
+- 🕸️ **Graph** — Obsidian-style force-directed constellation. Drag, zoom, explore. Stale nodes fade. Verified nodes glow.
+- 🃏 **Cards** — visual grid for quick scanning
+- 📋 **Table** — sortable columns for data people
+- 🏗️ **Tree** — collapsible hierarchy grouped by type
+
+### Interactions
+- **Category tabs** filter by node type (People, Clients, Teams, Projects, Docs)
+- **Status filters** narrow within any category
+- **Search** across everything — the graph flies to matching nodes
+- **Click any node** — detail panel with connections, verification, tags
+- **Verify / Edit** — anyone suggests changes, approvers verify, everything traceable
 
 ### The Core Idea
 
-> You open it and YOU are at the center. Your clients radiate outward. Stale connections fade. Verified connections glow. The health of your operational world is visible at a glance.
-
-Anyone can update. Only certain people verify. Everything is traceable.
+> Anyone at any level finds what they need in seconds. Anyone can update. Only certain people verify. Everything is traceable.
 
 ---
 
@@ -69,8 +83,9 @@ The map stays clean. The agents handle the messy stuff.
 ```
 /OperationalMap
 ├── docs/
-│   └── index.html          ← GitHub Pages (live graph demo)
-├── demo-graph.html          ← Graph prototype source (primary demo)
+│   └── index.html          ← GitHub Pages (live demo — v4)
+├── demo-v4.html             ← Current prototype (4 views, universal nodes)
+├── demo-graph.html          ← Graph-only prototype (earlier iteration)
 ├── demo-map.html            ← List-based map prototype
 ├── demo-dashboard.html      ← Full dashboard demo (vision reference)
 ├── demo.html                ← Original dashboard prototype
