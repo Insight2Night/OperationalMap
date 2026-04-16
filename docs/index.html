@@ -43,25 +43,37 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .search-wrap::before{content:'🔍';position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.4}
 .header-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
 
-/* TOOLBAR */
-.toolbar{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--card-border);flex-wrap:wrap}
-
-/* CATEGORY TABS */
-.cat-tabs{display:flex;gap:2px;background:var(--bg-light);border-radius:8px;padding:3px;border:1px solid var(--card-border)}
-.cat-tab{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text-dim);transition:var(--transition);font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:4px}
-.cat-tab:hover{color:var(--text-muted)}
-.cat-tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.2)}
-.cat-tab .cat-count{font-size:10px;opacity:0.5}
+/* TOOLBAR — top row: search + view toggle */
+.toolbar{display:flex;align-items:center;gap:10px;padding-bottom:0}
 
 /* VIEW TOGGLE */
-.view-toggle{display:flex;gap:2px;background:var(--bg-light);border-radius:8px;padding:3px;border:1px solid var(--card-border);margin-left:auto}
+.view-toggle{display:flex;gap:2px;background:var(--bg-light);border-radius:8px;padding:3px;border:1px solid var(--card-border);flex-shrink:0}
 .view-btn{padding:4px 10px;border-radius:6px;cursor:pointer;border:none;background:transparent;color:var(--text-dim);transition:var(--transition);font-size:11px;display:flex;align-items:center;justify-content:center;gap:4px;font-family:inherit;font-weight:600;white-space:nowrap}
 .view-btn:hover{color:var(--text-muted)}
 .view-btn.active{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.2)}
 
+/* FILTER BAR */
+.filter-bar{border-bottom:1px solid var(--card-border);padding:0;flex-shrink:0}
+.filter-toggle-row{display:flex;align-items:center;gap:8px;padding:8px 0}
+.filter-toggle-btn{display:none;padding:5px 10px;border-radius:8px;border:1px solid var(--card-border);background:var(--bg-light);color:var(--text-muted);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;align-items:center;gap:5px;transition:var(--transition)}
+.filter-toggle-btn:hover{border-color:var(--purple);color:var(--purple-light)}
+.filter-toggle-btn.has-filters{border-color:var(--purple);color:var(--purple-light);background:var(--purple-bg)}
+.filter-active-chips{display:flex;gap:4px;flex-wrap:wrap;flex:1;align-items:center}
+.active-chip{padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;background:var(--purple-bg);color:var(--purple-light);border:1px solid rgba(109,32,119,0.2);display:inline-flex;align-items:center;gap:4px;cursor:pointer;transition:var(--transition)}
+.active-chip:hover{background:rgba(220,38,38,0.1);color:var(--red);border-color:rgba(220,38,38,0.2)}
+.active-chip .chip-x{font-size:12px;line-height:1}
+.clear-all-btn{font-size:10px;color:var(--text-dim);cursor:pointer;border:none;background:none;font-family:inherit;font-weight:600;transition:var(--transition);white-space:nowrap;padding:3px 6px}
+.clear-all-btn:hover{color:var(--red)}
+
+.filter-sections{display:flex;gap:0;padding:0 0 10px;overflow:hidden;transition:max-height 0.3s ease}
+.filter-sections.collapsed{max-height:0!important;padding:0;overflow:hidden}
+.filter-section{display:flex;align-items:center;gap:6px;padding-right:16px;margin-right:16px;border-right:1px solid var(--card-border)}
+.filter-section:last-child{border-right:none;margin-right:0;padding-right:0}
+.fs-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);white-space:nowrap;min-width:40px}
+.fs-pills{display:flex;gap:3px;flex-wrap:wrap}
+
 /* FILTERS */
-.filter-wrap{display:flex;align-items:center;gap:6px}
-.filter-chip{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--card-border);background:transparent;color:var(--text-dim);transition:var(--transition);font-family:inherit}
+.filter-chip{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--card-border);background:transparent;color:var(--text-dim);transition:var(--transition);font-family:inherit;white-space:nowrap}
 .filter-chip:hover{border-color:var(--purple);color:var(--text-muted)}
 .filter-chip.active{background:var(--purple-bg);border-color:var(--purple);color:var(--purple-light)}
 
@@ -217,18 +229,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   .brand .tagline{display:none}
   .search-wrap{min-width:0;max-width:none;flex:1}
   .search-wrap input{padding:8px 12px 8px 32px;font-size:12px}
-  .toolbar{gap:6px;padding-bottom:10px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .toolbar::-webkit-scrollbar{display:none}
-  .cat-tabs{flex-shrink:0;overflow-x:auto;scrollbar-width:none}
-  .cat-tabs::-webkit-scrollbar{display:none}
-  .cat-tab{padding:4px 8px;font-size:10px}
-  .cat-tab .cat-count{display:none}
-  .view-toggle{margin-left:0;flex-shrink:0}
+  .toolbar{gap:6px;padding-bottom:10px}
+  .view-toggle{flex-shrink:0}
   .view-btn{padding:4px 6px;font-size:10px}
   .view-btn .btn-label-text{display:none}
-  .filter-wrap{flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .filter-wrap::-webkit-scrollbar{display:none}
-  .filter-chip{white-space:nowrap;flex-shrink:0}
+  .filter-bar{padding:0}
+  .filter-toggle-btn{display:flex!important}
+  .filter-sections{flex-direction:column;gap:8px}
+  .filter-section{border-right:none;margin-right:0;padding-right:0;padding-bottom:8px;border-bottom:1px solid var(--card-border)}
+  .filter-section:last-child{border-bottom:none;padding-bottom:0}
   .status-bar{padding:4px 12px;font-size:10px}
   .list-view{padding:12px}
   .card-grid{grid-template-columns:1fr;gap:8px}
@@ -258,7 +267,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   .brand h1{font-size:14px}
   .header{padding:8px 8px 0}
   .header-row{gap:6px;margin-bottom:8px}
-  .cat-tab{padding:3px 6px;font-size:9px}
   .view-btn{padding:3px 4px;font-size:9px;gap:2px}
   .node-card{padding:12px}
   .nc-name{font-size:12px}
@@ -267,6 +275,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   .graph-legend{bottom:48px;gap:4px;padding:3px 6px}
   .graph-legend-item{font-size:8px;gap:3px}
   .graph-legend-dot{width:6px;height:6px}
+  .filter-chip{padding:3px 7px;font-size:9px}
+  .active-chip{font-size:9px;padding:2px 6px}
 }
 </style>
 </head>
@@ -306,15 +316,20 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
   </div>
   <div class="toolbar">
-    <div class="cat-tabs" id="cat-tabs"></div>
-    <div class="filter-wrap" id="filter-wrap"></div>
     <div class="view-toggle">
-      <button class="view-btn active" data-view="graph" onclick="setView('graph',this)" title="Graph">🕸️ Graph</button>
-      <button class="view-btn" data-view="cards" onclick="setView('cards',this)" title="Cards">🃏 Cards</button>
-      <button class="view-btn" data-view="table" onclick="setView('table',this)" title="Table">📋 Table</button>
-      <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️ Tree</button>
-      <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝 Text</button>
+      <button class="view-btn active" data-view="graph" onclick="setView('graph',this)" title="Graph">🕸️ <span class="btn-label-text">Graph</span></button>
+      <button class="view-btn" data-view="cards" onclick="setView('cards',this)" title="Cards">🃏 <span class="btn-label-text">Cards</span></button>
+      <button class="view-btn" data-view="table" onclick="setView('table',this)" title="Table">📋 <span class="btn-label-text">Table</span></button>
+      <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️ <span class="btn-label-text">Tree</span></button>
+      <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝 <span class="btn-label-text">Text</span></button>
     </div>
+  </div>
+  <div class="filter-bar" id="filter-bar">
+    <div class="filter-toggle-row" id="filter-toggle-row">
+      <button class="filter-toggle-btn" id="filter-toggle-btn" onclick="toggleFilterPanel()">⚙ Filters</button>
+      <div class="filter-active-chips" id="filter-active-chips"></div>
+    </div>
+    <div class="filter-sections" id="filter-sections"></div>
   </div>
   <div class="status-bar" id="status-bar"></div>
 </div>
@@ -573,28 +588,109 @@ let activeFilters = new Set();
 // ============================================================
 // CATEGORY TABS & FILTERS
 // ============================================================
-function renderCatTabs() {
-  document.getElementById('cat-tabs').innerHTML = CATEGORIES.map(c =>
-    `<button class="cat-tab${currentCat===c.key?' active':''}" onclick="setCat('${c.key}')">${c.icon?c.icon+' ':''}${c.label} <span class="cat-count">${c.count}</span></button>`
-  ).join('');
-}
+let filterPanelOpen = true;
 
 function renderFilters() {
   const filtered = getFilteredNodes(true);
   const statuses = [...new Set(filtered.map(n => n.status).filter(Boolean))].sort();
+
+  // Build sections
   let html = '';
-  // Region pills
+
+  // TYPE section
+  html += '<div class="filter-section"><span class="fs-label">Type</span><div class="fs-pills">';
+  html += CATEGORIES.map(c =>
+    `<button class="filter-chip${currentCat===c.key?' active':''}" onclick="setCat('${c.key}')">${c.icon?c.icon+' ':''}${c.label}</button>`
+  ).join('');
+  html += '</div></div>';
+
+  // REGION section
+  html += '<div class="filter-section"><span class="fs-label">Region</span><div class="fs-pills">';
   html += REGIONS.map(r =>
     `<button class="filter-chip${currentRegion===r?' active':''}" onclick="setRegion('${r}')">${r==='All'?'🌐 All':r}</button>`
   ).join('');
-  html += '<span style="width:1px;height:16px;background:var(--card-border);margin:0 4px"></span>';
-  // Status pills
-  html += statuses.map(s =>
-    `<button class="filter-chip${activeFilters.has(s)?' active':''}" onclick="toggleFilter('${s}')">${s}</button>`
-  ).join('');
-  document.getElementById('filter-wrap').innerHTML = html;
-  // Status summary bar
+  html += '</div></div>';
+
+  // STATUS section
+  if (statuses.length) {
+    html += '<div class="filter-section"><span class="fs-label">Status</span><div class="fs-pills">';
+    html += statuses.map(s =>
+      `<button class="filter-chip${activeFilters.has(s)?' active':''}" onclick="toggleFilter('${s}')">${s}</button>`
+    ).join('');
+    html += '</div></div>';
+  }
+
+  document.getElementById('filter-sections').innerHTML = html;
+
+  // Active chip summary row
+  renderActiveChips();
   renderStatusBar();
+
+  // Sync collapsed state
+  const sections = document.getElementById('filter-sections');
+  if (!filterPanelOpen) sections.classList.add('collapsed'); else sections.classList.remove('collapsed');
+}
+
+function renderActiveChips() {
+  const chips = [];
+  if (currentCat !== 'all') {
+    const c = CATEGORIES.find(c => c.key === currentCat);
+    chips.push({label: (c.icon||'')+' '+c.label, clear: "setCat('all')"});
+  }
+  if (currentRegion !== 'All') {
+    chips.push({label: '🌐 '+currentRegion, clear: `setRegion('All')`});
+  }
+  activeFilters.forEach(f => {
+    chips.push({label: '● '+f, clear: `toggleFilter('${f}')`});
+  });
+  if (searchQuery) {
+    chips.push({label: '🔍 "'+searchQuery+'"', clear: "clearSearch()"});
+  }
+
+  let html = '';
+  if (chips.length) {
+    html = chips.map(c =>
+      `<span class="active-chip" onclick="${c.clear}">${c.label} <span class="chip-x">✕</span></span>`
+    ).join('');
+    html += `<button class="clear-all-btn" onclick="clearAllFilters()">Clear all</button>`;
+  }
+  document.getElementById('filter-active-chips').innerHTML = html;
+
+  // Update toggle btn state
+  const btn = document.getElementById('filter-toggle-btn');
+  const hasActive = chips.length > 0;
+  btn.classList.toggle('has-filters', hasActive);
+  const count = chips.length;
+  btn.textContent = count ? `⚙ Filters (${count})` : '⚙ Filters';
+}
+
+function toggleFilterPanel() {
+  filterPanelOpen = !filterPanelOpen;
+  const sections = document.getElementById('filter-sections');
+  if (filterPanelOpen) {
+    sections.style.maxHeight = sections.scrollHeight + 'px';
+    sections.classList.remove('collapsed');
+  } else {
+    sections.style.maxHeight = sections.scrollHeight + 'px';
+    requestAnimationFrame(() => { sections.classList.add('collapsed'); sections.style.maxHeight = '0px'; });
+  }
+}
+
+function clearAllFilters() {
+  currentCat = 'all';
+  currentRegion = 'All';
+  activeFilters.clear();
+  searchQuery = '';
+  document.getElementById('search').value = '';
+  renderFilters();
+  renderCurrentView();
+}
+
+function clearSearch() {
+  searchQuery = '';
+  document.getElementById('search').value = '';
+  renderFilters();
+  renderCurrentView();
 }
 
 function renderStatusBar() {
@@ -609,7 +705,7 @@ function renderStatusBar() {
   document.getElementById('status-bar').innerHTML = bar;
 }
 
-function setCat(cat) { currentCat = cat; activeFilters.clear(); renderCatTabs(); renderFilters(); renderCurrentView(); }
+function setCat(cat) { currentCat = cat; activeFilters.clear(); renderFilters(); renderCurrentView(); }
 function setRegion(r) { currentRegion = r; renderFilters(); renderCurrentView(); }
 function toggleFilter(f) { activeFilters.has(f) ? activeFilters.delete(f) : activeFilters.add(f); renderFilters(); renderCurrentView(); }
 
@@ -1262,7 +1358,8 @@ document.addEventListener('keydown', e => {
 // INIT
 // ============================================================
 window.addEventListener('resize', () => { gResize(); });
-gResize(); gBuild(); renderCatTabs(); renderFilters(); gLoop();
+filterPanelOpen = window.innerWidth > 768;
+gResize(); gBuild(); renderFilters(); gLoop();
 </script>
 </body>
 </html>
