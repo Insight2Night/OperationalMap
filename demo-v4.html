@@ -45,6 +45,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
 /* TOOLBAR — top row: search + view toggle */
 .toolbar{display:flex;align-items:center;gap:10px;padding-bottom:0}
+.export-btn{padding:5px 12px;border-radius:8px;border:1px solid var(--card-border);background:var(--bg-light);color:var(--text-muted);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;transition:var(--transition);white-space:nowrap;margin-left:auto}
+.export-btn:hover{border-color:var(--purple);color:var(--purple-light);background:var(--purple-bg)}
 
 /* VIEW TOGGLE */
 .view-toggle{display:flex;gap:2px;background:var(--bg-light);border-radius:8px;padding:3px;border:1px solid var(--card-border);flex-shrink:0}
@@ -233,6 +235,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   .view-toggle{flex-shrink:0}
   .view-btn{padding:4px 6px;font-size:10px}
   .view-btn .btn-label-text{display:none}
+  .export-btn .btn-label-text{display:none}
+  .export-btn{padding:4px 8px;font-size:10px;margin-left:auto}
   .filter-bar{padding:0}
   .filter-toggle-btn{display:flex!important}
   .filter-sections{flex-direction:column;gap:8px}
@@ -323,6 +327,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="view-btn" data-view="tree" onclick="setView('tree',this)" title="Tree">🏗️ <span class="btn-label-text">Tree</span></button>
       <button class="view-btn" data-view="text" onclick="setView('text',this)" title="Text">📝 <span class="btn-label-text">Text</span></button>
     </div>
+    <button class="export-btn" onclick="exportCSV()" title="Export filtered view as CSV">📥 <span class="btn-label-text">Export</span></button>
   </div>
   <div class="filter-bar" id="filter-bar">
     <div class="filter-toggle-row" id="filter-toggle-row">
@@ -691,6 +696,62 @@ function clearSearch() {
   document.getElementById('search').value = '';
   renderFilters();
   renderCurrentView();
+}
+
+// ============================================================
+// CSV EXPORT
+// ============================================================
+function csvEscape(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function exportCSV() {
+  const nodes = getFilteredNodes();
+  if (!nodes.length) { showToast('⚠️', 'No nodes to export'); return; }
+
+  const cols = ['Name','Type','Description','Status','Region','Department','Tags','Verified','Verified By','Days Stale','Connections','Connected To'];
+
+  const rows = nodes.map(n => {
+    const conns = EDGES.filter(e => e.from === n.id || e.to === n.id);
+    const connNames = conns.map(e => {
+      const otherId = e.from === n.id ? e.to : e.from;
+      const other = nodeMap[otherId];
+      return other ? (other.name + (e.label ? ' (' + e.label + ')' : '')) : otherId;
+    });
+    return [
+      n.name,
+      n.type,
+      n.sub || '',
+      n.status || '',
+      n.region || '',
+      n.dept || '',
+      (n.tags || []).join('; '),
+      n.verified || '',
+      n.verifiedBy || '',
+      n.daysStale != null ? n.daysStale : '',
+      conns.length,
+      connNames.join('; ')
+    ].map(csvEscape).join(',');
+  });
+
+  const csv = [cols.join(','), ...rows].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const filters = [];
+  if (currentCat !== 'all') filters.push(currentCat);
+  if (currentRegion !== 'All') filters.push(currentRegion);
+  if (searchQuery) filters.push(searchQuery.replace(/[^a-zA-Z0-9]/g,''));
+  a.download = 'operational-map' + (filters.length ? '-' + filters.join('-') : '') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥', `Exported ${nodes.length} nodes to CSV`);
 }
 
 function renderStatusBar() {
