@@ -208,6 +208,66 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .gate-input.shake{animation:gateShake 0.4s ease}
 .gate-error{font-size:11px;color:var(--red);margin-top:8px;min-height:16px}
 @keyframes gateShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media(max-width:768px){
+  .header{padding:10px 12px 0}
+  .header-row{gap:8px;margin-bottom:10px}
+  .brand h1{font-size:16px}
+  .brand .tagline{display:none}
+  .search-wrap{min-width:0;max-width:none;flex:1}
+  .search-wrap input{padding:8px 12px 8px 32px;font-size:12px}
+  .toolbar{gap:6px;padding-bottom:10px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .toolbar::-webkit-scrollbar{display:none}
+  .cat-tabs{flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+  .cat-tabs::-webkit-scrollbar{display:none}
+  .cat-tab{padding:4px 8px;font-size:10px}
+  .cat-tab .cat-count{display:none}
+  .view-toggle{margin-left:0;flex-shrink:0}
+  .view-btn{padding:4px 6px;font-size:10px}
+  .view-btn .btn-label-text{display:none}
+  .filter-wrap{flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .filter-wrap::-webkit-scrollbar{display:none}
+  .filter-chip{white-space:nowrap;flex-shrink:0}
+  .status-bar{padding:4px 12px;font-size:10px}
+  .list-view{padding:12px}
+  .card-grid{grid-template-columns:1fr;gap:8px}
+  .node-card{padding:14px}
+  .data-table{font-size:11px}
+  .data-table th,.data-table td{padding:6px 8px}
+  .hide-mobile{display:none}
+  .tree-children{padding-left:12px}
+  .text-view{max-width:none}
+  .tv-conns{gap:3px}
+  .tv-conn-tag{font-size:9px;padding:1px 6px}
+  .detail-panel{width:100%;max-width:100vw}
+  .dp-head{padding:16px 14px 12px}
+  .dp-body{padding:12px 14px}
+  .dp-title{font-size:15px}
+  .graph-legend{bottom:52px;left:8px;gap:6px;padding:4px 8px;flex-wrap:wrap;max-width:calc(100vw - 16px)}
+  .graph-legend-item{font-size:9px}
+  .graph-controls{bottom:12px;right:8px}
+  .graph-ctrl-btn .btn-label{display:none}
+  .graph-ctrl-btn{padding:0;width:32px}
+  .horizon-bar{padding:4px 12px;gap:8px}
+  .horizon-name{display:none}
+  .horizon-logo{font-size:10px}
+}
+
+@media(max-width:480px){
+  .brand h1{font-size:14px}
+  .header{padding:8px 8px 0}
+  .header-row{gap:6px;margin-bottom:8px}
+  .cat-tab{padding:3px 6px;font-size:9px}
+  .view-btn{padding:3px 4px;font-size:9px;gap:2px}
+  .node-card{padding:12px}
+  .nc-name{font-size:12px}
+  .nc-sub{font-size:10px}
+  .nc-footer{font-size:10px}
+  .graph-legend{bottom:48px;gap:4px;padding:3px 6px}
+  .graph-legend-item{font-size:8px;gap:3px}
+  .graph-legend-dot{width:6px;height:6px}
+}
 </style>
 </head>
 <body>
@@ -1091,6 +1151,24 @@ gCanvas.addEventListener('wheel',e=>{
   gUserZoomed=true;
 },{passive:false});
 gCanvas.addEventListener('dblclick',e=>{const rect=gCanvas.getBoundingClientRect();const hit=gHitTest(e.clientX-rect.left,e.clientY-rect.top);if(hit){gCam.tX=hit.x;gCam.tY=hit.y;gCam.tZ=Math.max(gCam.tZ,1.5);gUserZoomed=true;openDetail(hit.id);}});
+
+// Touch events for mobile
+let gTouches={};let gPinchDist=0;
+gCanvas.addEventListener('touchstart',e=>{e.preventDefault();const ts=e.touches;
+  if(ts.length===1){const t=ts[0];const rect=gCanvas.getBoundingClientRect();const mx=t.clientX-rect.left,my=t.clientY-rect.top;
+    const hit=gHitTest(mx,my);if(hit){gDrag=hit;}else{gPan=true;gPanStart={x:t.clientX,y:t.clientY,cx:gCam.tX,cy:gCam.tY};}}
+  if(ts.length===2){gPan=false;gDrag=null;const dx=ts[0].clientX-ts[1].clientX,dy=ts[0].clientY-ts[1].clientY;gPinchDist=Math.sqrt(dx*dx+dy*dy);}
+},{passive:false});
+gCanvas.addEventListener('touchmove',e=>{e.preventDefault();const ts=e.touches;
+  if(ts.length===1&&gDrag){const t=ts[0];const rect=gCanvas.getBoundingClientRect();const w=gScreenToWorld(t.clientX-rect.left,t.clientY-rect.top);gDrag.x=w.x;gDrag.y=w.y;gDrag.vx=0;gDrag.vy=0;gSim=true;gAlpha=Math.max(gAlpha,0.05);}
+  else if(ts.length===1&&gPan){const t=ts[0];const dx=t.clientX-gPanStart.x,dy=t.clientY-gPanStart.y;gCam.tX=gPanStart.cx-dx/gCam.zoom;gCam.tY=gPanStart.cy-dy/gCam.zoom;gUserZoomed=true;}
+  else if(ts.length===2){const dx=ts[0].clientX-ts[1].clientX,dy=ts[0].clientY-ts[1].clientY;const dist=Math.sqrt(dx*dx+dy*dy);
+    if(gPinchDist>0){const scale=dist/gPinchDist;gCam.tZ=Math.max(0.08,Math.min(5,gCam.tZ*scale));gUserZoomed=true;}gPinchDist=dist;}
+},{passive:false});
+gCanvas.addEventListener('touchend',e=>{
+  if(gDrag){const rect=gCanvas.getBoundingClientRect();if(e.changedTouches.length){const t=e.changedTouches[0];const hit=gHitTest(t.clientX-rect.left,t.clientY-rect.top);if(hit===gDrag)openDetail(gDrag.id);}gDrag=null;}
+  gPan=false;gPinchDist=0;
+},{passive:false});
 
 // ============================================================
 // DETAIL PANEL
