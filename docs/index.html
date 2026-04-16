@@ -1053,31 +1053,80 @@ function gResize() {
 }
 
 function gBuild() {
-  // Place nodes in world space centered at 0,0 with wide initial spread
-  const spread = Math.max(gW, gH) * 1.2;
+  // Build node objects with physics state
   gNodes = NODES.map(n => {
     const r = 3 + Math.sqrt(n.connCount) * 2.5;
-    return {...n, x: (Math.random()-0.5)*spread, y: (Math.random()-0.5)*spread*0.7,
-      vx:0, vy:0, radius: r, baseRadius: r,
+    return {...n, x: 0, y: 0, vx:0, vy:0, tx:0, ty:0,
+      radius: r, baseRadius: r,
       glow: n.type==='person'?'rgba(109,32,119,0.4)':n.type==='client'?'rgba(0,164,228,0.35)':n.type==='project'?'rgba(22,163,74,0.3)':n.type==='doc'?'rgba(217,119,6,0.3)':'rgba(107,114,128,0.2)',
       opacity: n.daysStale != null ? (n.daysStale < 30 ? 1 : n.daysStale < 60 ? 0.55 : 0.3) : (n.status==='Historical'?0.35:0.9)
     };
   });
   const gNodeMap = {}; gNodes.forEach(n => gNodeMap[n.id] = n);
   gEdges = EDGES.map(e => ({...e, a: gNodeMap[e.from], b: gNodeMap[e.to]})).filter(e => e.a && e.b);
+
+  // Intelligent initial placement — place by type in loose clusters
+  const typeGroups = {};
+  gNodes.forEach(n => { (typeGroups[n.type] = typeGroups[n.type]||[]).push(n); });
+  const spread = Math.min(gW, gH) * 0.5;
+  gClusterTypes.forEach((type, i) => {
+    const angle = (i / gClusterTypes.length) * Math.PI * 2 - Math.PI/2;
+    const cx = Math.cos(angle) * spread * 0.4;
+    const cy = Math.sin(angle) * spread * 0.4;
+    const nodes = typeGroups[type] || [];
+    nodes.forEach((n, j) => {
+      const jAngle = (j / Math.max(nodes.length,1)) * Math.PI * 2;
+      const jr = 30 + Math.random() * 60;
+      n.x = cx + Math.cos(jAngle) * jr;
+      n.y = cy + Math.sin(jAngle) * jr;
+    });
+  });
   const youN = gNodes.find(n => n.you);
   if (youN) { youN.x = 0; youN.y = 0; }
+
   gCam.x = gCam.tX = 0; gCam.y = gCam.tY = 0;
   gDidInitFit = false; gUserZoomed = false;
   gComputeClusterCenters();
+  gComputeOrgTargets();
 }
 
 function gComputeClusterCenters() {
-  // Arrange type clusters in a ring
-  const clusterR = Math.min(gW, gH) * 0.6;
+  const clusterR = Math.min(gW, gH) * 0.55;
   gClusterTypes.forEach((type, i) => {
     const angle = (i / gClusterTypes.length) * Math.PI * 2 - Math.PI/2;
     gClusterCenters[type] = { x: Math.cos(angle) * clusterR, y: Math.sin(angle) * clusterR };
+  });
+}
+
+// Compute deterministic target positions for Organize mode
+function gComputeOrgTargets() {
+  const typeGroups = {};
+  gNodes.forEach(n => { (typeGroups[n.type] = typeGroups[n.type]||[]).push(n); });
+
+  gClusterTypes.forEach(type => {
+    const cc = gClusterCenters[type]; if (!cc) return;
+    const nodes = typeGroups[type] || [];
+    // Sort: most-connected first (center of cluster)
+    nodes.sort((a,b) => b.connCount - a.connCount);
+    const count = nodes.length;
+    if (count === 0) return;
+    if (count === 1) { nodes[0].tx = cc.x; nodes[0].ty = cc.y; return; }
+
+    // Arrange in concentric rings — inner ring for top nodes
+    const ringGap = 45;
+    let placed = 0;
+    let ring = 0;
+    while (placed < count) {
+      const ringR = ring === 0 ? 0 : ring * ringGap;
+      const slots = ring === 0 ? 1 : Math.min(Math.floor(Math.PI * 2 * ringR / 38), count - placed);
+      for (let s = 0; s < slots && placed < count; s++) {
+        const a = (s / slots) * Math.PI * 2 - Math.PI/2;
+        nodes[placed].tx = cc.x + Math.cos(a) * ringR;
+        nodes[placed].ty = cc.y + Math.sin(a) * ringR;
+        placed++;
+      }
+      ring++;
+    }
   });
 }
 
@@ -1097,109 +1146,145 @@ function gGetAlpha(node) {
   return node.opacity;
 }
 
+let gTransitionProgress = 0; // 0 = fully orbital physics, 1 = fully at targets
+
 function gSimulate() {
   if (!gSim) return;
-  if (gAlpha < 0.002) {
-    gSim = false;
-    if(!gDidInitFit){gDidInitFit=true;gRecenter();}
-    return;
-  }
-  gAlpha *= 0.992;
   const N = gNodes.length;
   const organized = gLayoutMode === 'organize';
+
+  // ── ORGANIZE MODE: target-based lerp, no physics ──
+  if (organized) {
+    gTransitionProgress = Math.min(1, gTransitionProgress + 0.04);
+    const t = gTransitionProgress;
+    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; // cubic ease-in-out
+    let maxDelta = 0;
+    gNodes.forEach(n => {
+      if (n === gDrag) return;
+      const lerpSpeed = 0.08 + ease * 0.1; // accelerates as transition progresses
+      n.x += (n.tx - n.x) * lerpSpeed;
+      n.y += (n.ty - n.y) * lerpSpeed;
+      n.vx = n.vy = 0;
+      maxDelta = Math.max(maxDelta, Math.abs(n.tx - n.x) + Math.abs(n.ty - n.y));
+    });
+    // Collision nudge (gentle)
+    for (let i=0;i<N;i++) {
+      const A=gNodes[i];
+      for (let j=i+1;j<N;j++) {
+        const B=gNodes[j];
+        if (A.type !== B.type) continue; // only within same cluster
+        const dx=B.x-A.x, dy=B.y-A.y, d=Math.sqrt(dx*dx+dy*dy)||0.1;
+        const minD=(A.radius+B.radius)*2.2;
+        if (d < minD) {
+          const push=(minD-d)*0.15;
+          const ux=dx/d,uy=dy/d;
+          if(A!==gDrag){A.x-=ux*push;A.y-=uy*push;}
+          if(B!==gDrag){B.x+=ux*push;B.y+=uy*push;}
+        }
+      }
+    }
+    if (maxDelta < 0.5 && gTransitionProgress >= 1) {
+      gSim = false;
+      if (!gDidInitFit) { gDidInitFit = true; gRecenter(); }
+    }
+    return;
+  }
+
+  // ── ORBITAL MODE: force-directed physics ──
+  if (gAlpha < 0.002) {
+    gSim = false;
+    if (!gDidInitFit) { gDidInitFit = true; gRecenter(); }
+    return;
+  }
+  gAlpha *= 0.993;
 
   // 1. Reset forces
   gNodes.forEach(n => { n.fx = 0; n.fy = 0; });
 
-  // 2. Gravity — either toward origin (orbital) or cluster centers (organize)
+  // 2. Gentle center gravity
   gNodes.forEach(n => {
-    if (n===gDrag) return;
-    if (organized) {
-      const cc = gClusterCenters[n.type] || {x:0,y:0};
-      n.fx += (cc.x - n.x) * 0.008;
-      n.fy += (cc.y - n.y) * 0.008;
-    } else {
-      n.fx -= n.x * 0.00003;
-      n.fy -= n.y * 0.00003;
-    }
+    if (n === gDrag) return;
+    n.fx -= n.x * 0.0001;
+    n.fy -= n.y * 0.0001;
   });
 
-  // 3. Node-node repulsion
-  for (let i=0;i<N;i++) {
-    const A=gNodes[i];
-    for (let j=i+1;j<N;j++) {
-      const B=gNodes[j];
-      const dx=B.x-A.x, dy=B.y-A.y;
-      let d=Math.sqrt(dx*dx+dy*dy)||0.1;
+  // 3. Node-node repulsion (Barnes-Hut simplified: skip far pairs)
+  for (let i = 0; i < N; i++) {
+    const A = gNodes[i];
+    for (let j = i+1; j < N; j++) {
+      const B = gNodes[j];
+      const dx = B.x-A.x, dy = B.y-A.y;
+      let d = Math.sqrt(dx*dx+dy*dy) || 0.1;
       const minDist = (A.radius + B.radius) * 4;
       let force;
       if (d < minDist) {
-        force = 5 / Math.max(d/minDist, 0.1);
+        force = 3 / Math.max(d/minDist, 0.1);
       } else {
-        force = (organized ? 1200 : 2000) / (d * d);
+        force = 1800 / (d * d);
       }
-      force = Math.min(force, 4);
-      const ux=dx/d, uy=dy/d;
-      if(A!==gDrag){A.fx-=ux*force;A.fy-=uy*force;}
-      if(B!==gDrag){B.fx+=ux*force;B.fy+=uy*force;}
+      force = Math.min(force, 2.5);
+      const ux = dx/d, uy = dy/d;
+      if (A !== gDrag) { A.fx -= ux*force; A.fy -= uy*force; }
+      if (B !== gDrag) { B.fx += ux*force; B.fy += uy*force; }
     }
   }
 
-  // 4. Edge springs
+  // 4. Edge springs — pull connected nodes together
   gEdges.forEach(e => {
-    const dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, d=Math.sqrt(dx*dx+dy*dy)||0.1;
-    const sameType = e.a.type===e.b.type;
-    const ideal = organized ? (sameType ? 80 : 300) : (sameType ? 150 : 220);
-    const stiffness = organized ? (sameType ? 0.005 : 0.001) : 0.003;
+    const dx = e.b.x-e.a.x, dy = e.b.y-e.a.y;
+    const d = Math.sqrt(dx*dx+dy*dy) || 0.1;
+    const sameType = e.a.type === e.b.type;
+    const ideal = sameType ? 100 : 180;
+    const stiffness = e.primary ? 0.006 : 0.003;
     let force = (d - ideal) * stiffness;
-    force = Math.sign(force) * Math.min(Math.abs(force), 1.5);
-    const ux=dx/d, uy=dy/d;
-    if(e.a!==gDrag){e.a.fx+=ux*force;e.a.fy+=uy*force;}
-    if(e.b!==gDrag){e.b.fx-=ux*force;e.b.fy-=uy*force;}
+    force = Math.sign(force) * Math.min(Math.abs(force), 1.2);
+    const ux = dx/d, uy = dy/d;
+    if (e.a !== gDrag) { e.a.fx += ux*force; e.a.fy += uy*force; }
+    if (e.b !== gDrag) { e.b.fx -= ux*force; e.b.fy -= uy*force; }
   });
 
-  // 5. Hover expansion
+  // 5. Hover expansion — gently push neighbors apart for readability
   if (gHover && !gDrag) {
     gEdges.forEach(e => {
       let neighbor = null;
       if (e.a === gHover) neighbor = e.b;
       else if (e.b === gHover) neighbor = e.a;
       if (!neighbor || neighbor === gDrag) return;
-      const dx=neighbor.x-gHover.x, dy=neighbor.y-gHover.y;
-      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const dx = neighbor.x - gHover.x, dy = neighbor.y - gHover.y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
       if (d < 120) {
-        const push = (120-d)*0.05;
+        const push = (120-d) * 0.04;
         neighbor.fx += (dx/d)*push;
         neighbor.fy += (dy/d)*push;
       }
     });
   }
 
-  // 6. Apply forces
+  // 6. Apply forces with strong damping
   gNodes.forEach(n => {
-    if(n===gDrag){n.vx=0;n.vy=0;return;}
-    n.vx = (n.vx + n.fx * gAlpha) * 0.65;
-    n.vy = (n.vy + n.fy * gAlpha) * 0.65;
+    if (n === gDrag) { n.vx = 0; n.vy = 0; return; }
+    n.vx = (n.vx + n.fx * gAlpha) * 0.7;
+    n.vy = (n.vy + n.fy * gAlpha) * 0.7;
     const spd = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
-    if(spd > 5){const s=5/spd; n.vx*=s; n.vy*=s;}
+    if (spd > 4) { const s = 4/spd; n.vx *= s; n.vy *= s; }
     n.x += n.vx;
     n.y += n.vy;
   });
 
   // 7. Collision resolution
-  for (let iter=0;iter<2;iter++) {
-    for (let i=0;i<N;i++) {
-      const A=gNodes[i];
-      for (let j=i+1;j<N;j++) {
-        const B=gNodes[j];
-        const dx=B.x-A.x, dy=B.y-A.y;
-        const d=Math.sqrt(dx*dx+dy*dy)||0.1;
-        const minD = (A.radius+B.radius)*2.5;
+  for (let iter = 0; iter < 2; iter++) {
+    for (let i = 0; i < N; i++) {
+      const A = gNodes[i];
+      for (let j = i+1; j < N; j++) {
+        const B = gNodes[j];
+        const dx = B.x-A.x, dy = B.y-A.y;
+        const d = Math.sqrt(dx*dx+dy*dy) || 0.1;
+        const minD = (A.radius+B.radius) * 2.5;
         if (d < minD) {
           const overlap = (minD-d)/2;
-          const ux=dx/d, uy=dy/d;
-          if(A!==gDrag){A.x-=ux*overlap;A.y-=uy*overlap;}
-          if(B!==gDrag){B.x+=ux*overlap;B.y+=uy*overlap;}
+          const ux = dx/d, uy = dy/d;
+          if (A !== gDrag) { A.x -= ux*overlap; A.y -= uy*overlap; }
+          if (B !== gDrag) { B.x += ux*overlap; B.y += uy*overlap; }
         }
       }
     }
@@ -1213,34 +1298,50 @@ function gDraw() {
   const gs=50*gCam.zoom;
   if(gs>8){gCtx.fillStyle='rgba(45,53,72,0.12)';const ox=(gW/2-gCam.x*gCam.zoom)%gs,oy=(gH/2-gCam.y*gCam.zoom)%gs;for(let x=ox;x<gW;x+=gs)for(let y=oy;y<gH;y+=gs){gCtx.beginPath();gCtx.arc(x,y,0.5,0,Math.PI*2);gCtx.fill();}}
 
-  // Cluster zones (organize mode) — soft rings with labels
+  // Cluster zones (organize mode) — soft regions with labels
   if(gLayoutMode==='organize'){
     gClusterTypes.forEach(type=>{
       const cc=gClusterCenters[type];if(!cc)return;
       const s=gWorldToScreen(cc.x,cc.y);
-      const zoneR=120*gCam.zoom;
-      // Soft ring
-      gCtx.beginPath();gCtx.arc(s.x,s.y,zoneR,0,Math.PI*2);
-      gCtx.strokeStyle=gClusterColors[type]||'#6b7280';gCtx.globalAlpha=0.08;gCtx.lineWidth=1;gCtx.stroke();
-      // Fill hint
+      // Compute actual radius from node positions
+      let maxR=60;
+      gNodes.forEach(n=>{if(n.type!==type)return;const dx=n.x-cc.x,dy=n.y-cc.y;maxR=Math.max(maxR,Math.sqrt(dx*dx+dy*dy)+n.radius*3);});
+      const zoneR=maxR*gCam.zoom;
+      // Soft filled region
       const grd=gCtx.createRadialGradient(s.x,s.y,0,s.x,s.y,zoneR);
-      grd.addColorStop(0,(gClusterColors[type]||'#6b7280')+'0A');grd.addColorStop(1,'transparent');
-      gCtx.fillStyle=grd;gCtx.globalAlpha=0.15;gCtx.fill();
-      // Label
-      gCtx.globalAlpha=0.35;gCtx.font='700 11px Inter,sans-serif';gCtx.textAlign='center';gCtx.textBaseline='middle';
+      grd.addColorStop(0,(gClusterColors[type]||'#6b7280')+'08');grd.addColorStop(0.7,(gClusterColors[type]||'#6b7280')+'05');grd.addColorStop(1,'transparent');
+      gCtx.fillStyle=grd;gCtx.globalAlpha=0.6;gCtx.beginPath();gCtx.arc(s.x,s.y,zoneR,0,Math.PI*2);gCtx.fill();
+      // Subtle ring
+      gCtx.beginPath();gCtx.arc(s.x,s.y,zoneR,0,Math.PI*2);
+      gCtx.strokeStyle=gClusterColors[type]||'#6b7280';gCtx.globalAlpha=0.06;gCtx.lineWidth=1;gCtx.stroke();
+      // Label above cluster
+      gCtx.globalAlpha=0.4;gCtx.font='700 11px Inter,sans-serif';gCtx.textAlign='center';gCtx.textBaseline='middle';
       gCtx.fillStyle=gClusterColors[type]||'#6b7280';
-      gCtx.fillText(gClusterLabels[type]||type,s.x,s.y-zoneR-10);
+      gCtx.fillText((gClusterLabels[type]||type).toUpperCase(),s.x,s.y-zoneR-12);
       gCtx.globalAlpha=1;
     });
   }
 
-  // Edges — thin lines like Obsidian
+  // Edges — thin lines, curved for cross-type in organize mode
+  const organized = gLayoutMode === 'organize';
   gEdges.forEach(e => {
     const sa=gWorldToScreen(e.a.x,e.a.y),sb=gWorldToScreen(e.b.x,e.b.y);
     const aA=gGetAlpha(e.a),aB=gGetAlpha(e.b),ea=Math.min(aA,aB);
     if(ea<0.01)return;
     const isHovered=gHover&&(e.a===gHover||e.b===gHover);
-    gCtx.beginPath();gCtx.moveTo(sa.x,sa.y);gCtx.lineTo(sb.x,sb.y);
+    gCtx.beginPath();
+    // Curved edges for cross-type (organize mode) — shows inter-cluster relationships
+    if (organized && e.a.type !== e.b.type) {
+      const mx = (sa.x+sb.x)/2, my = (sa.y+sb.y)/2;
+      const dx = sb.x-sa.x, dy = sb.y-sa.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const curve = dist * 0.15;
+      const cx = mx + (-dy/dist) * curve;
+      const cy = my + (dx/dist) * curve;
+      gCtx.moveTo(sa.x,sa.y);gCtx.quadraticCurveTo(cx,cy,sb.x,sb.y);
+    } else {
+      gCtx.moveTo(sa.x,sa.y);gCtx.lineTo(sb.x,sb.y);
+    }
     if(isHovered){gCtx.strokeStyle=e.primary?`rgba(109,32,119,${ea*0.8})`:`rgba(139,148,158,${ea*0.6})`;gCtx.lineWidth=1.5;}
     else{gCtx.strokeStyle=e.primary?`rgba(109,32,119,${ea*0.25})`:`rgba(139,148,158,${ea*0.12})`;gCtx.lineWidth=0.8;}
     gCtx.stroke();
@@ -1299,11 +1400,10 @@ function gHitTest(mx,my){const w=gScreenToWorld(mx,my);for(let i=gNodes.length-1
 
 function gLoop(){gCam.x+=(gCam.tX-gCam.x)*0.08;gCam.y+=(gCam.tY-gCam.y)*0.08;gCam.zoom+=(gCam.tZ-gCam.zoom)*0.08;if(currentView==='graph'){gSimulate();gDraw();}requestAnimationFrame(gLoop);}
 
-function graphRestart(){gSim=true;gAlpha=0.3;gNodes.forEach(n=>{n.vx+=(Math.random()-0.5)*2;n.vy+=(Math.random()-0.5)*2;});}
+function graphRestart(){gSim=true;gAlpha=0.3;}
 
 function toggleLegend(type){
   if(gHiddenTypes.has(type)) gHiddenTypes.delete(type); else gHiddenTypes.add(type);
-  // Update legend UI
   document.querySelectorAll('.graph-legend-item').forEach(el => {
     const t = el.textContent.trim().toLowerCase();
     const typeMap = {people:'person',clients:'client',teams:'team',projects:'project',docs:'doc',external:'external'};
@@ -1315,18 +1415,28 @@ function gToggleLayout(){
   gLayoutMode = gLayoutMode==='orbital' ? 'organize' : 'orbital';
   const btn = document.getElementById('layout-toggle');
   if(gLayoutMode==='organize'){
-    btn.innerHTML='\uD83C\uDF0C <span class="btn-label">Orbital</span>';
+    btn.innerHTML = IC.graph + ' <span class="btn-label">Orbital</span>';
     btn.classList.add('active');
+    // Compute fresh targets and start lerp transition
+    gComputeClusterCenters();
+    gComputeOrgTargets();
+    gTransitionProgress = 0;
+    gSim = true;
+    gDidInitFit = false;
+    gUserZoomed = false;
+    // Kill all velocity so transition is clean
+    gNodes.forEach(n => { n.vx = 0; n.vy = 0; });
   } else {
-    btn.innerHTML='\u2728 <span class="btn-label">Organize</span>';
+    btn.innerHTML = IC.sparkles + ' <span class="btn-label">Organize</span>';
     btn.classList.remove('active');
+    // Switch back to physics — give a gentle push from current positions
+    gSim = true;
+    gAlpha = 0.5;
+    gTransitionProgress = 0;
+    gDidInitFit = false;
+    gUserZoomed = false;
+    gNodes.forEach(n => { n.vx = 0; n.vy = 0; });
   }
-  // Re-fire simulation to animate the transition
-  gSim=true; gAlpha=Math.max(gAlpha,0.6);
-  gUserZoomed=false;
-  gNodes.forEach(n=>{n.vx*=0.3;n.vy*=0.3;});
-  // Auto-fit after transition settles
-  gDidInitFit=false;
 }
 
 function gRecenter(){
