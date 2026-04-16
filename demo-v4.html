@@ -196,9 +196,32 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
 
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:3px}
+
+/* PASSWORD GATE */
+.gate-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px}
+.gate-overlay.hidden{display:none}
+.gate-box{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:40px 36px;text-align:center;max-width:360px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.4)}
+.gate-box h2{font-size:18px;font-weight:800;margin-bottom:4px;letter-spacing:-0.3px}
+.gate-box .gate-sub{font-size:12px;color:var(--text-muted);margin-bottom:24px}
+.gate-input{width:100%;padding:12px 16px;border:1px solid var(--card-border);border-radius:10px;font-size:14px;background:var(--bg-light);color:var(--text);font-family:inherit;text-align:center;letter-spacing:1px;transition:var(--transition)}
+.gate-input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,32,119,0.15)}
+.gate-input.shake{animation:gateShake 0.4s ease}
+.gate-error{font-size:11px;color:var(--red);margin-top:8px;min-height:16px}
+@keyframes gateShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 </style>
 </head>
 <body>
+
+<!-- PASSWORD GATE -->
+<div class="gate-overlay" id="gate-overlay">
+  <div class="gate-box">
+    <h2>🗺️ Operational Map</h2>
+    <div class="gate-sub">Internal demo — enter access code</div>
+    <input type="password" class="gate-input" id="gate-input" placeholder="Access code" autofocus
+      onkeydown="if(event.key==='Enter')checkGate()">
+    <div class="gate-error" id="gate-error"></div>
+  </div>
+</div>
 
 <!-- HORIZON BAR -->
 <div class="horizon-bar">
@@ -270,6 +293,33 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="toast-container" id="toast-container"></div>
 
 <script>
+// ============================================================
+// PASSWORD GATE
+// ============================================================
+// SHA-256 hash of the access code (not stored in plaintext)
+const GATE_HASH = '9d3dcf208e161ac1317e62507bfeec2e7a94c718d545f69a29a067d58224dd80';
+async function sha256(str){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+(function(){
+  if(sessionStorage.getItem('map_authed')==='1'){
+    document.getElementById('gate-overlay').classList.add('hidden');
+  }
+})();
+
+async function checkGate(){
+  const input=document.getElementById('gate-input');
+  const hash=await sha256(input.value.trim());
+  if(hash===GATE_HASH){
+    sessionStorage.setItem('map_authed','1');
+    document.getElementById('gate-overlay').classList.add('hidden');
+  } else {
+    document.getElementById('gate-error').textContent='Incorrect access code';
+    input.classList.add('shake');
+    input.value='';
+    setTimeout(()=>input.classList.remove('shake'),400);
+  }
+}
+
 // ============================================================
 // DATA MODEL — Universal Nodes & Edges
 // ============================================================
